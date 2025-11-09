@@ -5,6 +5,7 @@ using Microsoft.IdentityModel.Tokens;
 using SCNexus.Core.API.Data;
 using SCNexus.Core.API.Models;
 using System.Text;
+using SCNexus.Core.API.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -49,6 +50,7 @@ builder.Services.AddAuthentication(options =>
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+builder.Services.AddScoped<UserService>();
 
 var app = builder.Build();
 

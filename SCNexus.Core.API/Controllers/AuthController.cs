@@ -64,18 +64,20 @@ namespace SCNexus.Core.API.Controllers
                 new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
             };
 
-            var jwtKey = _config["Jwt:Key"] ?? throw new InvalidOperationException("JWT Key not configured");
-            var jwtIssuer = _config["Jwt:Issuer"] ?? "SCNexus.Core.API";
+          var jwtKey = _config["Jwt:Key"] ?? throw new InvalidOperationException("JWT Key not configured");
+var jwtIssuer = _config["Jwt:Issuer"] ?? throw new InvalidOperationException("JWT Issuer not configured");
+var jwtAudience = _config["Jwt:Audience"] ?? throw new InvalidOperationException("JWT Audience not configured");
 
-            var authSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
+var authSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
 
-            var token = new JwtSecurityToken(
-                issuer: jwtIssuer,
-                audience: jwtIssuer,
-                expires: DateTime.Now.AddHours(3),
-                claims: authClaims,
-                signingCredentials: new SigningCredentials(authSigningKey, SecurityAlgorithms.HmacSha256)
-            );
+var token = new JwtSecurityToken(
+    issuer: jwtIssuer,
+    audience: jwtAudience,          // <-- aquí usamos Audience correcto
+    expires: DateTime.Now.AddHours(3),
+    claims: authClaims,
+    signingCredentials: new SigningCredentials(authSigningKey, SecurityAlgorithms.HmacSha256)
+);
+
 
             return Ok(new
             {
