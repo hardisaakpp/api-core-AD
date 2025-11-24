@@ -23,7 +23,7 @@ namespace SCNexus.Core.API.Controllers
         }
 
         [HttpPost("register")]
-        [AllowAnonymous]
+        [AllowAnonymous] //CUALQUIER USUARIO PUEDE REGISTRARSE
         public async Task<IActionResult> Register([FromBody] RegisterRequest model)
         {
             if (model == null || string.IsNullOrWhiteSpace(model.UserName) || string.IsNullOrWhiteSpace(model.Password))
@@ -63,6 +63,13 @@ namespace SCNexus.Core.API.Controllers
                 new Claim(ClaimTypes.Name, user.UserName ?? string.Empty),
                 new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
             };
+
+            // Añadir roles del usuario como claims para que la autorización por Roles funcione
+            var userRoles = await _userManager.GetRolesAsync(user);
+            foreach (var r in userRoles)
+            {
+                authClaims.Add(new Claim(ClaimTypes.Role, r));
+            }
 
           var jwtKey = _config["Jwt:Key"] ?? throw new InvalidOperationException("JWT Key not configured");
 var jwtIssuer = _config["Jwt:Issuer"] ?? throw new InvalidOperationException("JWT Issuer not configured");

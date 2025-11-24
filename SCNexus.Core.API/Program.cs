@@ -52,6 +52,16 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddScoped<UserService>();
 
+// Try to determine HTTPS port from environment/config to avoid the warning:
+// "Failed to determine the https port for redirect." This commonly occurs when
+// running outside of Visual Studio where launchSettings.json is not used.
+var httpsPortSetting = builder.Configuration["ASPNETCORE_HTTPS_PORT"];
+if (int.TryParse(httpsPortSetting, out var httpsPort))
+{
+    // Configure HttpsRedirectionOptions in DI so app.UseHttpsRedirection() knows the port
+    builder.Services.Configure<Microsoft.AspNetCore.HttpsPolicy.HttpsRedirectionOptions>(options => options.HttpsPort = httpsPort);
+}
+
 var app = builder.Build();
 
 // 🔹 Middleware
@@ -60,7 +70,6 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 }
-
 app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();
