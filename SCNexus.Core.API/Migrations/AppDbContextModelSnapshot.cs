@@ -215,6 +215,14 @@ namespace SCNexus.Core.API.Migrations
                         .HasColumnType("bit")
                         .HasColumnName("email_confirmed");
 
+                    b.Property<string>("ExternalId")
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("external_id");
+
+                    b.Property<string>("ExternalProvider")
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("external_provider");
+
                     b.Property<string>("FullName")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)")
@@ -289,7 +297,8 @@ namespace SCNexus.Core.API.Migrations
                         .HasColumnName("id");
 
                     b.Property<string>("Action")
-                        .HasColumnType("nvarchar(max)")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)")
                         .HasColumnName("action");
 
                     b.Property<DateTime>("CreatedAt")
@@ -297,11 +306,13 @@ namespace SCNexus.Core.API.Migrations
                         .HasColumnName("created_at");
 
                     b.Property<string>("TableName")
-                        .HasColumnType("nvarchar(max)")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)")
                         .HasColumnName("table_name");
 
                     b.Property<string>("UserName")
-                        .HasColumnType("nvarchar(max)")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)")
                         .HasColumnName("user_name");
 
                     b.HasKey("Id")

@@ -51,6 +51,7 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddScoped<UserService>();
+builder.Services.AddScoped<AdLdapSyncService>();
 
 // Try to determine HTTPS port from environment/config to avoid the warning:
 // "Failed to determine the https port for redirect." This commonly occurs when

@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
 using SCNexus.Core.API.Models;
+using SCNexus.Core.API.Services;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
@@ -15,11 +16,13 @@ namespace SCNexus.Core.API.Controllers
     {
         private readonly UserManager<AppUser> _userManager;
         private readonly IConfiguration _config;
+        private readonly AdLdapSyncService _adLdapSyncService;
 
-        public AuthController(UserManager<AppUser> userManager, IConfiguration config)
+        public AuthController(UserManager<AppUser> userManager, IConfiguration config, AdLdapSyncService adLdapSyncService)
         {
             _userManager = userManager;
             _config = config;
+            _adLdapSyncService = adLdapSyncService;
         }
 
         [HttpPost("register")]
@@ -54,9 +57,56 @@ namespace SCNexus.Core.API.Controllers
             if (model == null || string.IsNullOrWhiteSpace(model.UserName) || string.IsNullOrWhiteSpace(model.Password))
                 return BadRequest("Invalid login data.");
 
-            var user = await _userManager.FindByNameAsync(model.UserName);
-            if (user == null || !await _userManager.CheckPasswordAsync(user, model.Password))
-                return Unauthorized("Invalid username or password.");
+            AppUser? user = null;
+
+            // Autenticación por Active Directory
+            if (model.UseActiveDirectory)
+            {
+                // Verificar primero si el usuario existe localmente y es un usuario AD
+                user = await _userManager.FindByNameAsync(model.UserName);
+                if (user != null && !string.IsNullOrEmpty(user.ExternalProvider) && user.ExternalProvider != "LDAP")
+                {
+                    return Unauthorized("This user is not configured for Active Directory authentication.");
+                }
+
+                // Intentar autenticación usando PrincipalContext (mismo enfoque que el programa de consola)
+                user = await _adLdapSyncService.AuthenticateAdWithPrincipalContextAsync(model.UserName, model.Password, _userManager);
+
+                // Fallback al método LDAP si PrincipalContext no pudo autenticar
+                if (user == null)
+                {
+                    user = await _adLdapSyncService.AuthenticateLdapUserAsync(model.UserName, model.Password, _userManager);
+                }
+
+                if (user == null)
+                    return Unauthorized("Invalid Active Directory credentials or user not found.");
+                
+                // Verificar que el usuario autenticado es realmente de AD
+                if (string.IsNullOrEmpty(user.ExternalProvider) || user.ExternalProvider != "LDAP")
+                {
+                    return Unauthorized("User authentication failed: user is not an Active Directory user.");
+                }
+            }
+            // Autenticación local
+            else
+            {
+                user = await _userManager.FindByNameAsync(model.UserName);
+                if (user == null)
+                    return Unauthorized("Invalid username or password.");
+                
+                // Verificar que el usuario NO es de AD
+                if (!string.IsNullOrEmpty(user.ExternalProvider) && user.ExternalProvider == "LDAP")
+                {
+                    return Unauthorized("This user must authenticate using Active Directory. Please set useActiveDirectory to true.");
+                }
+                
+                // Verificar contraseña local
+                if (!await _userManager.CheckPasswordAsync(user, model.Password))
+                    return Unauthorized("Invalid username or password.");
+            }
+
+            if (user == null || !user.IsActive)
+                return Unauthorized("User account is inactive.");
 
             var authClaims = new List<Claim>
             {
