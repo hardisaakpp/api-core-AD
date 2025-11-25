@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using SCNexus.Core.API.Data;
+using SCNexus.Core.API.Helpers;
 using SCNexus.Core.API.Models;
 using System.Text;
 using SCNexus.Core.API.Services;
@@ -50,6 +51,7 @@ builder.Services.AddAuthentication(options =>
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<UserService>();
 builder.Services.AddScoped<AdLdapSyncService>();
 
@@ -75,5 +77,24 @@ app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
+
+// Seedear datos iniciales (roles, permisos, usuario admin)
+using (var scope = app.Services.CreateScope())
+{
+    var services = scope.ServiceProvider;
+    try
+    {
+        var context = services.GetRequiredService<AppDbContext>();
+        var userManager = services.GetRequiredService<UserManager<AppUser>>();
+        var roleManager = services.GetRequiredService<RoleManager<IdentityRole>>();
+        
+        await DataSeeder.SeedAsync(context, userManager, roleManager);
+        Console.WriteLine("✅ Datos iniciales cargados correctamente");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"❌ Error al cargar datos iniciales: {ex.Message}");
+    }
+}
 
 app.Run();

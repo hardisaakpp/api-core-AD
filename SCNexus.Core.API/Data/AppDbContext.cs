@@ -14,14 +14,33 @@ namespace SCNexus.Core.API.Data
         {
         }
 
-        // Ejemplo de entidad del Core
-        // public DbSet<AuditLog> AuditLogs { get; set; }
         public DbSet<AuditLog> AuditLogs { get; set; } = null!;
+        public DbSet<Permission> Permissions { get; set; } = null!;
+        public DbSet<RolePermission> RolePermissions { get; set; } = null!;
 
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
+
+            // Configurar relación muchos a muchos entre Roles y Permissions
+            modelBuilder.Entity<RolePermission>()
+                .HasKey(rp => new { rp.RoleId, rp.PermissionId });
+
+            modelBuilder.Entity<RolePermission>()
+                .HasOne(rp => rp.Role)
+                .WithMany()
+                .HasForeignKey(rp => rp.RoleId);
+
+            modelBuilder.Entity<RolePermission>()
+                .HasOne(rp => rp.Permission)
+                .WithMany(p => p.RolePermissions)
+                .HasForeignKey(rp => rp.PermissionId);
+
+            // Índice único en Permission.Key
+            modelBuilder.Entity<Permission>()
+                .HasIndex(p => p.Key)
+                .IsUnique();
 
             // Aplica snake_case a tablas, columnas, claves e índices
             foreach (var entity in modelBuilder.Model.GetEntityTypes())
