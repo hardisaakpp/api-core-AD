@@ -1,0 +1,44 @@
+## Ignorar archivos de compilación de .NET
+bin/
+obj/
+*.user
+*.suo
+*.cache
+*.dll
+*.exe
+*.pdb
+*.log
+
+## Ignorar archivos de Visual Studio
+.vs/
+.vscode/
+*.sln.docstates
+
+## Ignorar archivos de entorno y secretos
+.env
+.env.production
+.env.local
+*.env
+
+## Ignorar archivos de base de datos
+*.db
+*.sqlite
+*.sqlite3
+
+## Ignorar archivos temporales
+*.tmp
+*.bak
+*.swp
+*~
+
+## Ignorar archivos de Docker
+docker-compose.override.yml
+
+## Ignorar node_modules si hay frontend
+node_modules/
+package-lock.json
+yarn.lock
+
+## Ignorar logs
+logs/
+*.log
