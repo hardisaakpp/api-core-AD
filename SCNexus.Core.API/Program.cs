@@ -48,6 +48,22 @@ builder.Services.AddAuthentication(options =>
     };
 });
 
+// 🔹 Configurar CORS
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowFrontend", policy =>
+    {
+        policy.WithOrigins(
+                  "http://localhost:3000", 
+                  "http://localhost:5053",
+                  "http://210.17.1.53:3000",
+                  "http://210.17.1.53:5053")
+              .AllowAnyMethod()
+              .AllowAnyHeader()
+              .AllowCredentials();
+    });
+});
+
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
@@ -68,12 +84,13 @@ if (int.TryParse(httpsPortSetting, out var httpsPort))
 var app = builder.Build();
 
 // 🔹 Middleware
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
+// Habilitar Swagger en todos los entornos
+app.UseSwagger();
+app.UseSwaggerUI();
+
 app.UseHttpsRedirection();
+app.UseRouting();
+app.UseCors("AllowFrontend");
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
