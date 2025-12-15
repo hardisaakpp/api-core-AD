@@ -69,6 +69,21 @@ namespace SCNexus.Core.API.Controllers
             return Ok();
         }
 
+        // DELETE: api/Users/{id}/roles/{roleName}
+        [HttpDelete("{id}/roles/{roleName}")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> RemoveRole(string id, string roleName)
+        {
+            if (string.IsNullOrWhiteSpace(roleName))
+                return BadRequest("Role requerido");
+
+            var result = await _userService.RemoveRoleFromUserAsync(id, roleName);
+            if (!result.Succeeded)
+                return BadRequest(result.Errors);
+
+            return Ok();
+        }
+
         // GET: api/Users/{id}
         [HttpGet("{id}")]
         [Authorize(Roles = "Admin")]
