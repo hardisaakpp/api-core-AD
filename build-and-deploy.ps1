@@ -112,7 +112,6 @@ tar -xzf scnexus-core.tar.gz -C scnexus-core-deploy
 # Crear Dockerfile simple (solo para binarios)
 cat > scnexus-core-deploy/Dockerfile << 'EOFDF'
 FROM mcr.microsoft.com/dotnet/aspnet:8.0
-RUN apt-get update && apt-get install -y libldap-2.5-0 libsasl2-2 ca-certificates && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY . .
 EXPOSE 8080
@@ -134,12 +133,9 @@ DOCKER_CMD="docker run -d --name scnexus-core-api --restart unless-stopped -p 50
 
 if [ -f __HOME_DIR__/.env.production ]; then
     echo "Usando variables de entorno de .env.production"
-    # Usar comillas simples para evitar que el shell expanda variables ($) en contraseñas
-    # También eliminamos \r por si el archivo fue creado en Windows
-    while IFS= read -r line || [ -n "$line" ]; do
-        line="${line%$'\r'}"
+    while IFS= read -r line; do
         if [ -n "$line" ] && [ "${line:0:1}" != "#" ]; then
-            DOCKER_CMD="$DOCKER_CMD -e '$line'"
+            DOCKER_CMD="$DOCKER_CMD -e \"$line\""
         fi
     done < __HOME_DIR__/.env.production
 else
