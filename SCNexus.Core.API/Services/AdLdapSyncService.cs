@@ -39,8 +39,29 @@ namespace SCNexus.Core.API.Services
             try
             {
                 using var context = new PrincipalContext(ContextType.Domain, domain);
-                var credentialsValid = context.ValidateCredentials(userName, password, ContextOptions.Negotiate);
-                if (!credentialsValid)
+                var candidates = new List<string>
+                {
+                    userName,
+                    $"{domain}\\{userName}",
+                    $"{userName}@{domain}"
+                };
+
+                string? validatedUser = null;
+                foreach (var candidate in candidates)
+                {
+                    var ok = context.ValidateCredentials(candidate, password, ContextOptions.Negotiate);
+                    if (ok)
+                    {
+                        validatedUser = candidate;
+                        break;
+                    }
+                    else
+                    {
+                        _logger.LogInformation("PrincipalContext format failed: {Candidate}", candidate);
+                    }
+                }
+
+                if (validatedUser == null)
                 {
                     _logger.LogWarning("PrincipalContext reported invalid credentials for user {User}", userName);
                     return null;
@@ -124,11 +145,17 @@ namespace SCNexus.Core.API.Services
                 return 0;
             }
 
-            var ldapIdentifier = new LdapDirectoryIdentifier(host, port);
-            using var conn = new LdapConnection(ldapIdentifier);
+                var useLdaps = bool.TryParse(_config["Ldap:UseLdaps"], out var ssl) && ssl;
+                var ldapIdentifier = new LdapDirectoryIdentifier(host, port);
+                using var conn = new LdapConnection(ldapIdentifier)
+                {
+                    AuthType = AuthType.Basic
+                };
             try
             {
                 conn.SessionOptions.ProtocolVersion = 3;
+                conn.SessionOptions.SecureSocketLayer = useLdaps;
+                conn.SessionOptions.VerifyServerCertificate += (con, cert) => true;
                 var cred = new NetworkCredential(bindDn, bindPassword);
                 conn.Bind(cred);
             }
@@ -221,12 +248,18 @@ namespace SCNexus.Core.API.Services
                 return null;
             }
 
+            var useLdaps = bool.TryParse(_config["Ldap:UseLdaps"], out var ssl) && ssl;
             var ldapIdentifier = new LdapDirectoryIdentifier(host, port);
-            using var conn = new LdapConnection(ldapIdentifier);
+            using var conn = new LdapConnection(ldapIdentifier)
+            {
+                AuthType = AuthType.Basic
+            };
             
             try
             {
                 conn.SessionOptions.ProtocolVersion = 3;
+                conn.SessionOptions.SecureSocketLayer = useLdaps;
+                conn.SessionOptions.VerifyServerCertificate += (con, cert) => true;
                 // Primero hacer bind con el usuario de servicio para buscar al usuario
                 var serviceCred = new NetworkCredential(bindDn, bindPassword);
                 conn.Bind(serviceCred);
@@ -276,10 +309,15 @@ namespace SCNexus.Core.API.Services
             }
 
             // Intentar autenticar con las credenciales del usuario
-            using var authConn = new LdapConnection(ldapIdentifier);
+            using var authConn = new LdapConnection(ldapIdentifier)
+            {
+                AuthType = AuthType.Basic
+            };
             try
             {
                 authConn.SessionOptions.ProtocolVersion = 3;
+                authConn.SessionOptions.SecureSocketLayer = useLdaps;
+                authConn.SessionOptions.VerifyServerCertificate += (con, cert) => true;
                 // Intentar bind con el DN del usuario y su contraseña
                 var userCred = new NetworkCredential(userDn, password);
                 authConn.Bind(userCred);
