@@ -112,6 +112,7 @@ namespace SCNexus.Core.API.Services
         {
             var host = _config["Ldap:Host"];
             var port = int.Parse(_config["Ldap:Port"] ?? "389");
+            var useLdaps = bool.TryParse(_config["Ldap:UseLdaps"], out var ldaps) ? ldaps : false;
             var bindDn = _config["Ldap:BindDn"];
             var bindPassword = _config["Ldap:BindPassword"];
             var searchBase = _config["Ldap:SearchBase"] ?? string.Empty;
@@ -125,10 +126,19 @@ namespace SCNexus.Core.API.Services
             }
 
             var ldapIdentifier = new LdapDirectoryIdentifier(host, port);
-            using var conn = new LdapConnection(ldapIdentifier);
+            using var conn = new LdapConnection(ldapIdentifier)
+            {
+                AuthType = AuthType.Basic
+            };
             try
             {
                 conn.SessionOptions.ProtocolVersion = 3;
+                if (useLdaps)
+                {
+                    conn.SessionOptions.SecureSocketLayer = true;
+                }
+                // Aceptar certificados del servidor (útil para LDAPS con self-signed)
+                conn.SessionOptions.VerifyServerCertificate += (c, cert) => true;
                 var cred = new NetworkCredential(bindDn, bindPassword);
                 conn.Bind(cred);
             }
@@ -210,6 +220,7 @@ namespace SCNexus.Core.API.Services
         {
             var host = _config["Ldap:Host"];
             var port = int.Parse(_config["Ldap:Port"] ?? "389");
+            var useLdaps = bool.TryParse(_config["Ldap:UseLdaps"], out var ldaps) ? ldaps : false;
             var bindDn = _config["Ldap:BindDn"];
             var bindPassword = _config["Ldap:BindPassword"];
             var searchBase = _config["Ldap:SearchBase"] ?? string.Empty;
@@ -222,11 +233,19 @@ namespace SCNexus.Core.API.Services
             }
 
             var ldapIdentifier = new LdapDirectoryIdentifier(host, port);
-            using var conn = new LdapConnection(ldapIdentifier);
+            using var conn = new LdapConnection(ldapIdentifier)
+            {
+                AuthType = AuthType.Basic
+            };
             
             try
             {
                 conn.SessionOptions.ProtocolVersion = 3;
+                if (useLdaps)
+                {
+                    conn.SessionOptions.SecureSocketLayer = true;
+                }
+                conn.SessionOptions.VerifyServerCertificate += (c, cert) => true;
                 // Primero hacer bind con el usuario de servicio para buscar al usuario
                 var serviceCred = new NetworkCredential(bindDn, bindPassword);
                 conn.Bind(serviceCred);
@@ -276,10 +295,18 @@ namespace SCNexus.Core.API.Services
             }
 
             // Intentar autenticar con las credenciales del usuario
-            using var authConn = new LdapConnection(ldapIdentifier);
+            using var authConn = new LdapConnection(ldapIdentifier)
+            {
+                AuthType = AuthType.Basic
+            };
             try
             {
                 authConn.SessionOptions.ProtocolVersion = 3;
+                if (useLdaps)
+                {
+                    authConn.SessionOptions.SecureSocketLayer = true;
+                }
+                authConn.SessionOptions.VerifyServerCertificate += (c, cert) => true;
                 // Intentar bind con el DN del usuario y su contraseña
                 var userCred = new NetworkCredential(userDn, password);
                 authConn.Bind(userCred);

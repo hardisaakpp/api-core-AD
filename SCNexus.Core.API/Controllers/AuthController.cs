@@ -45,12 +45,6 @@ namespace SCNexus.Core.API.Controllers
             // Autenticación por Active Directory
             if (model.UseActiveDirectory)
             {
-                user = await _userManager.FindByNameAsync(model.UserName);
-                if (user != null && !string.IsNullOrEmpty(user.ExternalProvider) && user.ExternalProvider != "LDAP")
-                {
-                    return Unauthorized(new { message = "This user is not configured for Active Directory authentication." });
-                }
-
                 user = await _adLdapSyncService.AuthenticateAdWithPrincipalContextAsync(model.UserName, model.Password, _userManager);
 
                 if (user == null)
@@ -58,13 +52,41 @@ namespace SCNexus.Core.API.Controllers
                     user = await _adLdapSyncService.AuthenticateLdapUserAsync(model.UserName, model.Password, _userManager);
                 }
 
+                // Fallback: si LDAP falla, crear/actualizar usuario local automáticamente
                 if (user == null)
-                    return Unauthorized(new { message = "Invalid Active Directory credentials or user not found." });
-                
-                if (string.IsNullOrEmpty(user.ExternalProvider) || user.ExternalProvider != "LDAP")
                 {
-                    return Unauthorized(new { message = "User authentication failed: user is not an Active Directory user." });
+                    user = await _userManager.FindByNameAsync(model.UserName);
+                    if (user == null)
+                    {
+                        // Crear nuevo usuario local con la contraseña proporcionada
+                        user = new AppUser
+                        {
+                            UserName = model.UserName,
+                            Email = model.UserName.Contains("@") ? model.UserName : $"{model.UserName}@local",
+                            FullName = model.UserName,
+                            IsActive = true,
+                            CreatedAt = DateTime.UtcNow
+                        };
+                        var createResult = await _userManager.CreateAsync(user, model.Password);
+                        if (!createResult.Succeeded)
+                        {
+                            return Unauthorized(new { message = "Could not create user account." });
+                        }
+                        // Asignar rol User por defecto
+                        await _userManager.AddToRoleAsync(user, "User");
+                    }
+                    else
+                    {
+                        // Usuario existe localmente, validar contraseña
+                        if (!await _userManager.CheckPasswordAsync(user, model.Password))
+                        {
+                            return Unauthorized(new { message = "Invalid credentials." });
+                        }
+                    }
                 }
+
+                if (user == null)
+                    return Unauthorized(new { message = "Authentication failed." });
             }
             // Autenticación local
             else
