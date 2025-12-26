@@ -6,8 +6,8 @@
 # - ⚡ Más rápido (compila en tu PC)
 
 param(
-    [string]$ServerIP = "172.30.159.208",
-    [string]$ServerUser = "usuario",
+    [string]$ServerIP = "192.168.2.153",
+    [string]$ServerUser = "root",
     [switch]$SkipTests = $false
 )
 
@@ -69,7 +69,8 @@ Write-Host ""
 Write-Host "Subiendo al servidor ${ServerIP}..." -ForegroundColor Cyan
 
 # Subir al servidor
-scp scnexus-core.tar.gz "${ServerUser}@${ServerIP}:/home/${ServerUser}/"
+$homeDir = if ($ServerUser -eq "root") { "/root/" } else { "/home/${ServerUser}/" }
+scp scnexus-core.tar.gz "${ServerUser}@${ServerIP}:${homeDir}"
 
 if ($LASTEXITCODE -ne 0) {
     Write-Host ""
@@ -92,7 +93,7 @@ echo "  Desplegando SCNexus Core en el servidor"
 echo "=============================================="
 echo ""
 
-cd /home/{0}
+cd __HOME_DIR__
 
 # Detener contenedor anterior
 echo "Deteniendo contenedor anterior..."
@@ -126,22 +127,27 @@ if ! docker build -t scnexus-core-api:latest . ; then
     exit 1
 fi
 
-# Verificar si existe .env.production
-if [ -f /home/{0}/.env.production ]; then
+# Preparar variables de entorno
+echo "Preparando variables de entorno..."
+DOCKER_CMD="docker run -d --name scnexus-core-api --restart unless-stopped -p 5053:8080"
+
+if [ -f __HOME_DIR__/.env.production ]; then
     echo "Usando variables de entorno de .env.production"
-    ENV_FILE="--env-file /home/{0}/.env.production"
+    while IFS= read -r line; do
+        if [ -n "$line" ] && [ "${line:0:1}" != "#" ]; then
+            DOCKER_CMD="$DOCKER_CMD -e \"$line\""
+        fi
+    done < __HOME_DIR__/.env.production
 else
     echo "Advertencia: .env.production no encontrado, usando valores por defecto"
-    ENV_FILE="-e ASPNETCORE_ENVIRONMENT=Production -e Jwt__Key=clave_super_secreta_para_jwt_12345 -e Jwt__Issuer=SCNexus.Core -e Jwt__Audience=SCNexus.Users"
+    DOCKER_CMD="$DOCKER_CMD -e ASPNETCORE_ENVIRONMENT=Production -e Jwt__Key=clave_super_secreta_para_jwt_12345 -e Jwt__Issuer=SCNexus.Core -e Jwt__Audience=SCNexus.Users"
 fi
+
+DOCKER_CMD="$DOCKER_CMD scnexus-core-api:latest"
 
 # Ejecutar contenedor
 echo "Iniciando contenedor..."
-docker run -d --name scnexus-core-api \
-    --restart unless-stopped \
-    -p 5053:8080 \
-    $ENV_FILE \
-    scnexus-core-api:latest
+eval $DOCKER_CMD
 
 # Verificar estado
 echo ""
@@ -156,7 +162,11 @@ else
 fi
     
     # Limpiar archivo zip
-'@ -f $ServerUser
+'@
+
+# Reemplazar placeholder de home dir y normalizar saltos de línea
+$deployScript = $deployScript -replace '__HOME_DIR__', $homeDir
+$deployScript = $deployScript -replace "`r`n", "`n"
 
 # Convertir a Unix line endings (LF solo)
 $deployScript = $deployScript -replace "`r`n", "`n"
