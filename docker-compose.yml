@@ -2,8 +2,13 @@ services:
   scnexus-core-api:
     build: ./SCNexus.Core.API
     container_name: scnexus-core-api
+    network_mode: bridge
+    extra_hosts:
+      - "sunsetcorp.local:10.10.100.8"
+      - "host.docker.internal:host-gateway"
     ports:
       - "8080:8080"
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
       - ConnectionStrings__DefaultConnection=Server=210.17.1.54;Database=SCNexusDB;User Id=desadmin;Password=***REMOVED***;TrustServerCertificate=True;
+

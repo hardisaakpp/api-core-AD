@@ -51,12 +51,7 @@ namespace SCNexus.Core.API.Controllers
                     return Unauthorized(new { message = "This user is not configured for Active Directory authentication." });
                 }
 
-                user = await _adLdapSyncService.AuthenticateAdWithPrincipalContextAsync(model.UserName, model.Password, _userManager);
-
-                if (user == null)
-                {
-                    user = await _adLdapSyncService.AuthenticateLdapUserAsync(model.UserName, model.Password, _userManager);
-                }
+                user = await _adLdapSyncService.AuthenticateLdapUserAsync(model.UserName, model.Password, _userManager);
 
                 if (user == null)
                     return Unauthorized(new { message = "Invalid Active Directory credentials or user not found." });

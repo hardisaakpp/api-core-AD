@@ -8,6 +8,12 @@ RUN dotnet publish -c Release -o out
 # Etapa de ejecución
 FROM mcr.microsoft.com/dotnet/aspnet:8.0
 WORKDIR /app
+
+# Instalar librerías LDAP necesarias para System.DirectoryServices.Protocols
+RUN apt-get update && \
+    apt-get install -y libldap-2.5-0 && \
+    rm -rf /var/lib/apt/lists/*
+
 COPY --from=build /app/out .
 
 EXPOSE 8080
