@@ -83,5 +83,15 @@ namespace SCNexus.Core.API.Services
             var result = await _userManager.ResetPasswordAsync(user, token, newPassword);
             return result;
         }
+
+        public async Task<IdentityResult> RemoveRoleFromUserAsync(string userId, string role)
+        {
+            var user = await _userManager.FindByIdAsync(userId);
+            if (user == null)
+                return IdentityResult.Failed(new IdentityError { Description = "User not found." });
+
+            var result = await _userManager.RemoveFromRoleAsync(user, role);
+            return result;
+        }
     }
 }

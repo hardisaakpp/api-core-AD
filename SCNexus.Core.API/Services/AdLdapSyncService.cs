@@ -20,6 +20,117 @@ namespace SCNexus.Core.API.Services
             _logger = logger;
         }
 
+<<<<<<< HEAD
+=======
+        public async Task<AppUser?> AuthenticateAdWithPrincipalContextAsync(string userName, string password, UserManager<AppUser> userManager)
+        {
+            if (!OperatingSystem.IsWindows())
+            {
+                _logger.LogWarning("PrincipalContext authentication is only available on Windows hosts.");
+                return null;
+            }
+
+            var domain = _config["Ldap:Domain"];
+            if (string.IsNullOrWhiteSpace(domain))
+            {
+                _logger.LogWarning("LDAP domain not configured");
+                return null;
+            }
+
+            try
+            {
+                using var context = new PrincipalContext(ContextType.Domain, domain);
+                var candidates = new List<string>
+                {
+                    userName,
+                    $"{domain}\\{userName}",
+                    $"{userName}@{domain}"
+                };
+
+                string? validatedUser = null;
+                foreach (var candidate in candidates)
+                {
+                    var ok = context.ValidateCredentials(candidate, password, ContextOptions.Negotiate);
+                    if (ok)
+                    {
+                        validatedUser = candidate;
+                        break;
+                    }
+                    else
+                    {
+                        _logger.LogInformation("PrincipalContext format failed: {Candidate}", candidate);
+                    }
+                }
+
+                if (validatedUser == null)
+                {
+                    _logger.LogWarning("PrincipalContext reported invalid credentials for user {User}", userName);
+                    return null;
+                }
+
+                var principal = UserPrincipal.FindByIdentity(context, IdentityType.SamAccountName, userName)
+                                ?? UserPrincipal.FindByIdentity(context, IdentityType.UserPrincipalName, userName)
+                                ?? UserPrincipal.FindByIdentity(context, IdentityType.Name, userName);
+
+                var sam = principal?.SamAccountName;
+                var mail = principal?.EmailAddress;
+                var display = principal?.DisplayName ?? principal?.Name ?? userName;
+                var enabled = principal?.Enabled ?? true;
+
+                var externalId = sam ?? mail ?? userName;
+                if (string.IsNullOrWhiteSpace(externalId))
+                {
+                    _logger.LogWarning("PrincipalContext could not determine an externalId for {User}", userName);
+                    return null;
+                }
+
+                var localUser = await userManager.Users.FirstOrDefaultAsync(u => u.ExternalProvider == "LDAP" && u.ExternalId == externalId);
+                if (localUser == null && !string.IsNullOrWhiteSpace(mail))
+                {
+                    localUser = await userManager.FindByEmailAsync(mail);
+                }
+
+                if (localUser == null)
+                {
+                    localUser = new AppUser
+                    {
+                        UserName = !string.IsNullOrWhiteSpace(mail) ? mail : externalId,
+                        Email = mail,
+                        FullName = display ?? string.Empty,
+                        ExternalProvider = "LDAP",
+                        ExternalId = externalId,
+                        IsActive = enabled,
+                        CreatedAt = DateTime.UtcNow
+                    };
+
+                    var createResult = await userManager.CreateAsync(localUser);
+                    if (!createResult.Succeeded)
+                    {
+                        _logger.LogError("Failed to create local user for {UserName}: {Errors}", userName, string.Join(", ", createResult.Errors.Select(e => e.Description)));
+                        return null;
+                    }
+                }
+                else
+                {
+                    var changed = false;
+                    if (!string.IsNullOrWhiteSpace(mail) && localUser.Email != mail) { localUser.Email = mail; localUser.UserName = mail; changed = true; }
+                    if (!string.IsNullOrWhiteSpace(display) && localUser.FullName != display) { localUser.FullName = display; changed = true; }
+                    if (localUser.IsActive != enabled) { localUser.IsActive = enabled; changed = true; }
+                    if (string.IsNullOrWhiteSpace(localUser.ExternalProvider)) { localUser.ExternalProvider = "LDAP"; changed = true; }
+                    if (string.IsNullOrWhiteSpace(localUser.ExternalId)) { localUser.ExternalId = externalId; changed = true; }
+                    if (changed) await userManager.UpdateAsync(localUser);
+                }
+
+                return localUser;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "PrincipalContext authentication failed for {User}", userName);
+                return null;
+            }
+        }
+
+>>>>>>> 5dcf8478799cf86dc6dc3765bddba3092a076660
         public async Task<int> SyncUsersAsync(UserManager<AppUser> userManager, RoleManager<IdentityRole> roleManager, AppDbContext db)
         {
             var host = _config["Ldap:Host"];
@@ -36,13 +147,22 @@ namespace SCNexus.Core.API.Services
                 return 0;
             }
 
-            var ldapIdentifier = new LdapDirectoryIdentifier(host, port);
-            using var conn = new LdapConnection(ldapIdentifier);
+                var useLdaps = bool.TryParse(_config["Ldap:UseLdaps"], out var ssl) && ssl;
+                var ldapIdentifier = new LdapDirectoryIdentifier(host, port);
+                using var conn = new LdapConnection(ldapIdentifier)
+                {
+                    AuthType = AuthType.Basic
+                };
             try
             {
                 conn.SessionOptions.ProtocolVersion = 3;
+<<<<<<< HEAD
                 conn.AuthType = AuthType.Basic;
                 conn.Timeout = TimeSpan.FromSeconds(30);
+=======
+                conn.SessionOptions.SecureSocketLayer = useLdaps;
+                conn.SessionOptions.VerifyServerCertificate += (con, cert) => true;
+>>>>>>> 5dcf8478799cf86dc6dc3765bddba3092a076660
                 var cred = new NetworkCredential(bindDn, bindPassword);
                 conn.Bind(cred);
             }
@@ -135,14 +255,23 @@ namespace SCNexus.Core.API.Services
                 return null;
             }
 
+            var useLdaps = bool.TryParse(_config["Ldap:UseLdaps"], out var ssl) && ssl;
             var ldapIdentifier = new LdapDirectoryIdentifier(host, port);
-            using var conn = new LdapConnection(ldapIdentifier);
+            using var conn = new LdapConnection(ldapIdentifier)
+            {
+                AuthType = AuthType.Basic
+            };
             
             try
             {
                 conn.SessionOptions.ProtocolVersion = 3;
+<<<<<<< HEAD
                 conn.AuthType = AuthType.Basic;
                 conn.Timeout = TimeSpan.FromSeconds(30);
+=======
+                conn.SessionOptions.SecureSocketLayer = useLdaps;
+                conn.SessionOptions.VerifyServerCertificate += (con, cert) => true;
+>>>>>>> 5dcf8478799cf86dc6dc3765bddba3092a076660
                 // Primero hacer bind con el usuario de servicio para buscar al usuario
                 var serviceCred = new NetworkCredential(bindDn, bindPassword);
                 conn.Bind(serviceCred);
@@ -193,12 +322,20 @@ namespace SCNexus.Core.API.Services
             }
 
             // Intentar autenticar con las credenciales del usuario
-            using var authConn = new LdapConnection(ldapIdentifier);
+            using var authConn = new LdapConnection(ldapIdentifier)
+            {
+                AuthType = AuthType.Basic
+            };
             try
             {
                 authConn.SessionOptions.ProtocolVersion = 3;
+<<<<<<< HEAD
                 authConn.AuthType = AuthType.Basic;
                 authConn.Timeout = TimeSpan.FromSeconds(30);
+=======
+                authConn.SessionOptions.SecureSocketLayer = useLdaps;
+                authConn.SessionOptions.VerifyServerCertificate += (con, cert) => true;
+>>>>>>> 5dcf8478799cf86dc6dc3765bddba3092a076660
                 // Intentar bind con el DN del usuario y su contraseña
                 var userCred = new NetworkCredential(userDn, password);
                 authConn.Bind(userCred);
