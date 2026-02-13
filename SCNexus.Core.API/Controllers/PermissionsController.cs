@@ -62,6 +62,25 @@ namespace SCNexus.Core.API.Controllers
         }
 
         /// <summary>
+        /// Eliminar un permiso del catálogo
+        /// </summary>
+        [HttpDelete("{id:int}")]
+        public async Task<IActionResult> DeletePermission(int id)
+        {
+            var permission = await _context.Permissions.FindAsync(id);
+            if (permission == null)
+                return NotFound(new { message = "Permission not found." });
+
+            var rolePermissions = _context.RolePermissions.Where(rp => rp.PermissionId == id);
+            _context.RolePermissions.RemoveRange(rolePermissions);
+
+            _context.Permissions.Remove(permission);
+            await _context.SaveChangesAsync();
+
+            return Ok(new { message = "Permission deleted successfully." });
+        }
+
+        /// <summary>
         /// Asignar un permiso a un rol
         /// </summary>
         [HttpPost("assign")]
@@ -117,12 +136,29 @@ namespace SCNexus.Core.API.Controllers
         [HttpDelete("unassign")]
         public async Task<IActionResult> UnassignPermissionFromRole([FromBody] AssignPermissionRequest request)
         {
-            var role = await _roleManager.FindByNameAsync(request.RoleName);
+            return await UnassignPermissionInternal(request.RoleName, request.PermissionId);
+        }
+
+        /// <summary>
+        /// Remover un permiso de un rol (ruta explícita)
+        /// </summary>
+        [HttpDelete("role/{roleName}/permission/{permissionId:int}")]
+        public async Task<IActionResult> UnassignPermissionFromRoleByRoute(string roleName, int permissionId)
+        {
+            return await UnassignPermissionInternal(roleName, permissionId);
+        }
+
+        private async Task<IActionResult> UnassignPermissionInternal(string roleName, int permissionId)
+        {
+            if (string.IsNullOrWhiteSpace(roleName))
+                return BadRequest(new { message = "Role name is required." });
+
+            var role = await _roleManager.FindByNameAsync(roleName);
             if (role == null)
                 return NotFound(new { message = "Role not found." });
 
             var rolePermission = await _context.RolePermissions
-                .FirstOrDefaultAsync(rp => rp.RoleId == role.Id && rp.PermissionId == request.PermissionId);
+                .FirstOrDefaultAsync(rp => rp.RoleId == role.Id && rp.PermissionId == permissionId);
 
             if (rolePermission == null)
                 return NotFound(new { message = "Permission not assigned to role." });
