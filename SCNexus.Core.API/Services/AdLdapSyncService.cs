@@ -267,5 +267,124 @@ namespace SCNexus.Core.API.Services
 
             return localUser;
         }
+
+        public async Task<(bool Success, string Message, AppUser? User)> SearchAndImportUserAsync(string searchTerm, UserManager<AppUser> userManager, RoleManager<IdentityRole> roleManager)
+        {
+            var host = _config["Ldap:Host"];
+            var port = int.Parse(_config["Ldap:Port"] ?? "389");
+            var bindDn = _config["Ldap:BindDn"];
+            var bindPassword = _config["Ldap:BindPassword"];
+            var searchBase = _config["Ldap:SearchBase"] ?? string.Empty;
+            var userFilter = _config["Ldap:UserFilter"] ?? "(objectClass=user)";
+            var defaultRole = _config["Ldap:DefaultRole"] ?? "User";
+
+            if (string.IsNullOrWhiteSpace(host) || string.IsNullOrWhiteSpace(bindDn) || string.IsNullOrWhiteSpace(bindPassword))
+            {
+                return (false, "LDAP no está configurado", null);
+            }
+
+            var ldapIdentifier = new LdapDirectoryIdentifier(host, port);
+            using var conn = new LdapConnection(ldapIdentifier) { AuthType = AuthType.Basic };
+
+            try
+            {
+                conn.SessionOptions.ProtocolVersion = 3;
+                conn.Timeout = TimeSpan.FromSeconds(30);
+                var cred = new NetworkCredential(bindDn, bindPassword);
+                conn.Bind(cred);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error de conexión a LDAP");
+                return (false, "Error al conectar con LDAP", null);
+            }
+
+            // Buscar usuario por sAMAccountName, mail o displayName
+            var searchFilter = $"(&{userFilter}(|(sAMAccountName={searchTerm}*)(mail={searchTerm}*)(displayName=*{searchTerm}*)))";
+            var request = new SearchRequest(searchBase, searchFilter, SearchScope.Subtree, new[] { "sAMAccountName", "mail", "displayName", "userAccountControl" });
+            
+            SearchResponse? response;
+            try
+            {
+                response = (SearchResponse)conn.SendRequest(request);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error buscando usuario {SearchTerm}", searchTerm);
+                return (false, "Error al buscar en LDAP", null);
+            }
+
+            if (response.Entries.Count == 0)
+            {
+                return (false, "Usuario no encontrado en Active Directory", null);
+            }
+
+            var entry = response.Entries[0];
+            var sam = entry.Attributes["sAMAccountName"]?.GetValues(typeof(string)).FirstOrDefault()?.ToString();
+            var mail = entry.Attributes["mail"]?.GetValues(typeof(string)).FirstOrDefault()?.ToString();
+            var display = entry.Attributes["displayName"]?.GetValues(typeof(string)).FirstOrDefault()?.ToString();
+            var uacStr = entry.Attributes["userAccountControl"]?.GetValues(typeof(string)).FirstOrDefault()?.ToString();
+
+            bool enabled = true;
+            if (int.TryParse(uacStr, out var uac)) enabled = (uac & 2) == 0;
+
+            if (!enabled)
+            {
+                return (false, "La cuenta de usuario está deshabilitada en AD", null);
+            }
+
+            var externalId = sam ?? mail;
+            if (string.IsNullOrWhiteSpace(externalId))
+            {
+                return (false, "No se pudo determinar el identificador del usuario", null);
+            }
+
+            // Buscar usuario local
+            var localUser = await userManager.Users.FirstOrDefaultAsync(u => u.ExternalProvider == "LDAP" && u.ExternalId == externalId);
+            if (localUser == null && !string.IsNullOrWhiteSpace(mail))
+            {
+                localUser = await userManager.FindByEmailAsync(mail);
+            }
+
+            if (localUser == null)
+            {
+                // Crear usuario nuevo
+                var newUser = new AppUser
+                {
+                    UserName = !string.IsNullOrWhiteSpace(mail) ? mail : externalId,
+                    Email = mail,
+                    FullName = display ?? string.Empty,
+                    ExternalProvider = "LDAP",
+                    ExternalId = externalId,
+                    IsActive = enabled,
+                    CreatedAt = DateTime.UtcNow
+                };
+
+                var createResult = await userManager.CreateAsync(newUser);
+                if (!createResult.Succeeded)
+                {
+                    return (false, $"Error al crear usuario: {string.Join(", ", createResult.Errors.Select(e => e.Description))}", null);
+                }
+
+                if (!await roleManager.RoleExistsAsync(defaultRole))
+                {
+                    await roleManager.CreateAsync(new IdentityRole(defaultRole));
+                }
+
+                await userManager.AddToRoleAsync(newUser, defaultRole);
+                return (true, $"Usuario {externalId} importado correctamente", newUser);
+            }
+            else
+            {
+                // Actualizar usuario existente
+                var changed = false;
+                if (!string.IsNullOrWhiteSpace(mail) && localUser.Email != mail) { localUser.Email = mail; localUser.UserName = mail; changed = true; }
+                if (!string.IsNullOrWhiteSpace(display) && localUser.FullName != display) { localUser.FullName = display; changed = true; }
+                if (localUser.IsActive != enabled) { localUser.IsActive = enabled; changed = true; }
+                if (changed) await userManager.UpdateAsync(localUser);
+                
+                return (true, $"Usuario {externalId} actualizado correctamente", localUser);
+            }
+        }
     }
 }

@@ -31,5 +31,37 @@ namespace SCNexus.Core.API.Controllers
             var count = await _syncService.SyncUsersAsync(_userManager, _roleManager, _db);
             return Ok(new { processed = count });
         }
+
+        [HttpPost("search-and-import-user")]
+        public async Task<IActionResult> SearchAndImportUser([FromBody] SearchUserRequest request)
+        {
+            if (string.IsNullOrWhiteSpace(request.SearchTerm))
+            {
+                return BadRequest(new { message = "El término de búsqueda es requerido" });
+            }
+
+            var (success, message, user) = await _syncService.SearchAndImportUserAsync(request.SearchTerm, _userManager, _roleManager);
+            
+            if (success && user != null)
+            {
+                return Ok(new { 
+                    success = true, 
+                    message,
+                    user = new { 
+                        id = user.Id, 
+                        userName = user.UserName, 
+                        email = user.Email, 
+                        fullName = user.FullName 
+                    }
+                });
+            }
+
+            return BadRequest(new { success = false, message });
+        }
+    }
+
+    public class SearchUserRequest
+    {
+        public string SearchTerm { get; set; } = string.Empty;
     }
 }
