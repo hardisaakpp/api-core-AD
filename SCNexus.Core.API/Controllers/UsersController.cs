@@ -196,5 +196,26 @@ namespace SCNexus.Core.API.Controllers
             if (!result.Succeeded) return BadRequest(result.Errors);
             return Ok();
         }
+
+        // GET: api/Users/info/{id}
+        // Get basic user info (requires authentication, but not Admin role)
+        [HttpGet("info/{id}")]
+        [Authorize]
+        public async Task<IActionResult> GetUserInfo(string id)
+        {
+            var user = await _userService.GetByIdAsync(id);
+            if (user == null) return NotFound();
+
+            // Return only public/basic information
+            var userInfo = new
+            {
+                id = user.Id,
+                userName = user.UserName,
+                fullName = user.FullName,
+                email = user.Email
+            };
+
+            return Ok(userInfo);
+        }
     }
 }
