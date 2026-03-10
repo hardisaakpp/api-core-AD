@@ -9,9 +9,23 @@ namespace SCNexus.Core.API.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    [Authorize(Roles = "Admin")]
     public class AdminController : ControllerBase
     {
+        /// <summary>
+        /// Obtiene el nombre completo de un usuario local (no AD) por su ID.
+        /// GET: /api/Admin/user-local-name/{id}
+        /// </summary>
+        [HttpGet("user-local-name/{id}")]
+        [AllowAnonymous]
+        public async Task<IActionResult> GetLocalUserNameById(string id)
+        {
+            // Buscar usuario por ID
+            var user = await _userManager.FindByIdAsync(id);
+            if (user == null)
+                return NotFound(new { message = "Usuario no encontrado" });
+            // Devuelve el nombre de cualquier usuario (local o AD)
+            return Ok(new { id = user.Id, fullName = user.FullName });
+        }
         private readonly AdLdapSyncService _syncService;
         private readonly UserManager<AppUser> _userManager;
         private readonly RoleManager<IdentityRole> _roleManager;
