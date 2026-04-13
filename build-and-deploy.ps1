@@ -8,6 +8,7 @@
 param(
     [string]$ServerIP = "192.168.2.153",
     [string]$ServerUser = "root",
+    [string]$Environment = "Production",
     [switch]$SkipTests = $false
 )
 
@@ -111,7 +112,7 @@ tar -xzf scnexus-core.tar.gz -C scnexus-core-deploy
 
 # Crear Dockerfile simple (solo para binarios)
 cat > scnexus-core-deploy/Dockerfile << 'EOFDF'
-FROM mcr.microsoft.com/dotnet/aspnet:8.0
+FROM mcr.microsoft.com/dotnet/aspnet:10.0
 WORKDIR /app
 COPY . .
 EXPOSE 8080
@@ -129,25 +130,33 @@ fi
 
 # Preparar variables de entorno
 echo "Preparando variables de entorno..."
-DOCKER_CMD="docker run -d --name scnexus-core-api --restart unless-stopped -p 5053:8080"
+docker_args=(
+    -d
+    --name scnexus-core-api
+    --restart unless-stopped
+    -p 5053:8080
+)
 
 if [ -f __HOME_DIR__/.env.production ]; then
     echo "Usando variables de entorno de .env.production"
-    while IFS= read -r line; do
+    while IFS= read -r line || [ -n "$line" ]; do
         if [ -n "$line" ] && [ "${line:0:1}" != "#" ]; then
-            DOCKER_CMD="$DOCKER_CMD -e \"$line\""
+            docker_args+=( -e "$line" )
         fi
     done < __HOME_DIR__/.env.production
+
+    docker_args+=( -e "ASPNETCORE_ENVIRONMENT=__ASPNET_ENV__" )
+    docker_args+=( scnexus-core-api:latest )
+    docker run "${docker_args[@]}"
 else
     echo "Advertencia: .env.production no encontrado, usando valores por defecto"
-    DOCKER_CMD="$DOCKER_CMD -e ASPNETCORE_ENVIRONMENT=Production -e Jwt__Key=clave_super_secreta_para_jwt_12345 -e Jwt__Issuer=SCNexus.Core -e Jwt__Audience=SCNexus.Users"
+    docker_args+=( -e "ASPNETCORE_ENVIRONMENT=__ASPNET_ENV__" )
+    docker_args+=( -e "Jwt__Key=clave_super_secreta_para_jwt_12345" )
+    docker_args+=( -e "Jwt__Issuer=SCNexus.Core" )
+    docker_args+=( -e "Jwt__Audience=SCNexus.Users" )
+    docker_args+=( scnexus-core-api:latest )
+    docker run "${docker_args[@]}"
 fi
-
-DOCKER_CMD="$DOCKER_CMD scnexus-core-api:latest"
-
-# Ejecutar contenedor
-echo "Iniciando contenedor..."
-eval $DOCKER_CMD
 
 # Verificar estado
 echo ""
@@ -164,8 +173,9 @@ fi
     # Limpiar archivo zip
 '@
 
-# Reemplazar placeholder de home dir y normalizar saltos de línea
+# Reemplazar placeholders y normalizar saltos de línea
 $deployScript = $deployScript -replace '__HOME_DIR__', $homeDir
+$deployScript = $deployScript -replace '__ASPNET_ENV__', $Environment
 $deployScript = $deployScript -replace "`r`n", "`n"
 
 # Convertir a Unix line endings (LF solo)

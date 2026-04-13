@@ -53,11 +53,17 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend", policy =>
     {
-        policy.WithOrigins(
-                  "http://localhost:3000", 
-                  "http://localhost:5053",
-                  "http://210.17.1.53:3000",
-                  "http://210.17.1.53:5053")
+        policy.SetIsOriginAllowed(origin =>
+                  {
+                      // Permitir localhost en cualquier puerto (dev)
+                      var uri = new Uri(origin);
+                      return uri.Host == "localhost" ||
+                             uri.Host == "127.0.0.1" ||
+                             // Red interna de producción / staging / dev
+                             uri.Host.StartsWith("192.168.") ||
+                             uri.Host.StartsWith("210.17.1.") ||
+                             uri.Host.StartsWith("172.30.");
+                  })
               .AllowAnyMethod()
               .AllowAnyHeader()
               .AllowCredentials();
