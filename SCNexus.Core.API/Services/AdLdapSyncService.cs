@@ -23,7 +23,12 @@ namespace SCNexus.Core.API.Services
         public async Task<int> SyncUsersAsync(UserManager<AppUser> userManager, RoleManager<IdentityRole> roleManager, AppDbContext db)
         {
             var host = _config["Ldap:Host"];
-            var port = int.Parse(_config["Ldap:Port"] ?? "389");
+            var portValue = _config["Ldap:Port"];
+            if (!int.TryParse(portValue, out var port))
+            {
+                _logger.LogWarning("Invalid LDAP port value '{PortValue}'. Falling back to 389.", portValue);
+                port = 389;
+            }
             var bindDn = _config["Ldap:BindDn"];
             var bindPassword = _config["Ldap:BindPassword"];
             var searchBase = _config["Ldap:SearchBase"] ?? string.Empty;
@@ -126,7 +131,12 @@ namespace SCNexus.Core.API.Services
         public async Task<AppUser?> AuthenticateLdapUserAsync(string userName, string password, UserManager<AppUser> userManager)
         {
             var host = _config["Ldap:Host"];
-            var port = int.Parse(_config["Ldap:Port"] ?? "389");
+            var portValue = _config["Ldap:Port"];
+            if (!int.TryParse(portValue, out var port))
+            {
+                _logger.LogWarning("Invalid LDAP port value '{PortValue}'. Falling back to 389.", portValue);
+                port = 389;
+            }
             var bindDn = _config["Ldap:BindDn"];
             var bindPassword = _config["Ldap:BindPassword"];
             var searchBase = _config["Ldap:SearchBase"] ?? string.Empty;
@@ -271,7 +281,12 @@ namespace SCNexus.Core.API.Services
         public async Task<(bool Success, string Message, AppUser? User)> SearchAndImportUserAsync(string searchTerm, UserManager<AppUser> userManager, RoleManager<IdentityRole> roleManager)
         {
             var host = _config["Ldap:Host"];
-            var port = int.Parse(_config["Ldap:Port"] ?? "389");
+            var portValue = _config["Ldap:Port"];
+            if (!int.TryParse(portValue, out var port))
+            {
+                _logger.LogWarning("Invalid LDAP port value '{PortValue}'. Falling back to 389.", portValue);
+                port = 389;
+            }
             var bindDn = _config["Ldap:BindDn"];
             var bindPassword = _config["Ldap:BindPassword"];
             var searchBase = _config["Ldap:SearchBase"] ?? string.Empty;

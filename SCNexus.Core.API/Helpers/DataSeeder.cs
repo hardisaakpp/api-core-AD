@@ -62,31 +62,45 @@ namespace SCNexus.Core.API.Helpers
                 new Permission { Key = "reportes.export", Description = "Exportar reportes", Module = "reportes" }
             };
 
-            foreach (var permission in permissions)
+            var existingPermissionKeys = await context.Permissions
+                .Select(p => p.Key)
+                .ToListAsync();
+
+            var existingPermissionKeySet = new HashSet<string>(existingPermissionKeys);
+            var missingPermissions = permissions
+                .Where(p => !existingPermissionKeySet.Contains(p.Key))
+                .ToList();
+
+            if (missingPermissions.Count > 0)
             {
-                if (!await context.Permissions.AnyAsync(p => p.Key == permission.Key))
-                {
-                    context.Permissions.Add(permission);
-                }
+                context.Permissions.AddRange(missingPermissions);
             }
 
             await context.SaveChangesAsync();
 
             // 3. Asignar TODOS los permisos al rol Admin
             var adminRole = await roleManager.FindByNameAsync("Admin");
-            if (adminRole != null)
+            if (adminRole != null && !string.IsNullOrWhiteSpace(adminRole.Id))
             {
                 var allPermissions = await context.Permissions.ToListAsync();
-                foreach (var perm in allPermissions)
-                {
-                    if (!await context.RolePermissions.AnyAsync(rp => rp.RoleId == adminRole.Id && rp.PermissionId == perm.Id))
+                var existingAdminPermissionIds = await context.RolePermissions
+                    .Where(rp => rp.RoleId == adminRole.Id)
+                    .Select(rp => rp.PermissionId)
+                    .ToListAsync();
+
+                var existingAdminPermissionIdSet = new HashSet<int>(existingAdminPermissionIds);
+                var adminRolePermissionsToAdd = allPermissions
+                    .Where(perm => !existingAdminPermissionIdSet.Contains(perm.Id))
+                    .Select(perm => new RolePermission
                     {
-                        context.RolePermissions.Add(new RolePermission
-                        {
-                            RoleId = adminRole.Id,
-                            PermissionId = perm.Id
-                        });
-                    }
+                        RoleId = adminRole.Id,
+                        PermissionId = perm.Id
+                    })
+                    .ToList();
+
+                if (adminRolePermissionsToAdd.Count > 0)
+                {
+                    context.RolePermissions.AddRange(adminRolePermissionsToAdd);
                 }
             }
 
@@ -94,9 +108,9 @@ namespace SCNexus.Core.API.Helpers
             
             // Contabilidad: solo ver y crear en contabilidad y depósitos
             var contabilidadRole = await roleManager.FindByNameAsync("Contabilidad");
-            if (contabilidadRole != null)
+            if (contabilidadRole != null && !string.IsNullOrWhiteSpace(contabilidadRole.Id))
             {
-                var contabilidadPermKeys = new[] 
+                var contabilidadPermKeys = new List<string>
                 { 
                     "contabilidad.view", "contabilidad.create",
                     "depositos.view", "depositos.create"
@@ -106,24 +120,32 @@ namespace SCNexus.Core.API.Helpers
                     .Where(p => contabilidadPermKeys.Contains(p.Key))
                     .ToListAsync();
 
-                foreach (var perm in contabilidadPerms)
-                {
-                    if (!await context.RolePermissions.AnyAsync(rp => rp.RoleId == contabilidadRole.Id && rp.PermissionId == perm.Id))
+                var existingContabilidadPermissionIds = await context.RolePermissions
+                    .Where(rp => rp.RoleId == contabilidadRole.Id)
+                    .Select(rp => rp.PermissionId)
+                    .ToListAsync();
+
+                var existingContabilidadPermissionIdSet = new HashSet<int>(existingContabilidadPermissionIds);
+                var contabilidadRolePermissionsToAdd = contabilidadPerms
+                    .Where(perm => !existingContabilidadPermissionIdSet.Contains(perm.Id))
+                    .Select(perm => new RolePermission
                     {
-                        context.RolePermissions.Add(new RolePermission
-                        {
-                            RoleId = contabilidadRole.Id,
-                            PermissionId = perm.Id
-                        });
-                    }
+                        RoleId = contabilidadRole.Id,
+                        PermissionId = perm.Id
+                    })
+                    .ToList();
+
+                if (contabilidadRolePermissionsToAdd.Count > 0)
+                {
+                    context.RolePermissions.AddRange(contabilidadRolePermissionsToAdd);
                 }
             }
 
             // Gerente: ver todo, aprobar depósitos, cerrar períodos
             var gerenteRole = await roleManager.FindByNameAsync("Gerente");
-            if (gerenteRole != null)
+            if (gerenteRole != null && !string.IsNullOrWhiteSpace(gerenteRole.Id))
             {
-                var gerentePermKeys = new[] 
+                var gerentePermKeys = new List<string>
                 { 
                     "depositos.view", "depositos.approve",
                     "contabilidad.view", "contabilidad.close",
@@ -134,16 +156,24 @@ namespace SCNexus.Core.API.Helpers
                     .Where(p => gerentePermKeys.Contains(p.Key))
                     .ToListAsync();
 
-                foreach (var perm in gerentePerms)
-                {
-                    if (!await context.RolePermissions.AnyAsync(rp => rp.RoleId == gerenteRole.Id && rp.PermissionId == perm.Id))
+                var existingGerentePermissionIds = await context.RolePermissions
+                    .Where(rp => rp.RoleId == gerenteRole.Id)
+                    .Select(rp => rp.PermissionId)
+                    .ToListAsync();
+
+                var existingGerentePermissionIdSet = new HashSet<int>(existingGerentePermissionIds);
+                var gerenteRolePermissionsToAdd = gerentePerms
+                    .Where(perm => !existingGerentePermissionIdSet.Contains(perm.Id))
+                    .Select(perm => new RolePermission
                     {
-                        context.RolePermissions.Add(new RolePermission
-                        {
-                            RoleId = gerenteRole.Id,
-                            PermissionId = perm.Id
-                        });
-                    }
+                        RoleId = gerenteRole.Id,
+                        PermissionId = perm.Id
+                    })
+                    .ToList();
+
+                if (gerenteRolePermissionsToAdd.Count > 0)
+                {
+                    context.RolePermissions.AddRange(gerenteRolePermissionsToAdd);
                 }
             }
 
