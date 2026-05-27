@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using SCNexus.Core.API.Data;
 using SCNexus.Core.API.Models;
@@ -14,10 +15,12 @@ namespace SCNexus.Core.API.Controllers
     public class UsuariosAlmacenesController : ControllerBase
     {
         private readonly AppDbContext _context;
+        private readonly IConfiguration _config;
 
-        public UsuariosAlmacenesController(AppDbContext context)
+        public UsuariosAlmacenesController(AppDbContext context, IConfiguration config)
         {
             _context = context;
+            _config = config;
         }
 
         [HttpGet]
@@ -68,6 +71,26 @@ namespace SCNexus.Core.API.Controllers
                 })
                 .ToListAsync();
 
+            return Ok(items);
+        }
+
+        [HttpGet("almacenes")]
+        public async Task<IActionResult> GetAlmacenes()
+        {
+            var cs = _config.GetConnectionString("SCMaestrosConnection");
+            var items = new List<object>();
+            await using var conn = new SqlConnection(cs);
+            await conn.OpenAsync();
+            await using var cmd = new SqlCommand("SELECT cod_almacen, nombre FROM dbo.almacenes ORDER BY cod_almacen", conn);
+            await using var reader = await cmd.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+            {
+                items.Add(new
+                {
+                    codAlmacen = reader.GetString(0),
+                    nombre = reader.IsDBNull(1) ? null : reader.GetString(1)
+                });
+            }
             return Ok(items);
         }
 
@@ -126,24 +149,13 @@ namespace SCNexus.Core.API.Controllers
 
         private async Task<bool> AlmacenExisteEnScMaestros(string codAlmacen)
         {
-            var connection = _context.Database.GetDbConnection();
-            var wasOpen = connection.State == ConnectionState.Open;
-            try
-            {
-                if (!wasOpen) await connection.OpenAsync();
-                using var cmd = connection.CreateCommand();
-                cmd.CommandText = "SELECT COUNT(1) FROM SCMaestros.dbo.almacenes WHERE cod_almacen = @cod";
-                var param = cmd.CreateParameter();
-                param.ParameterName = "@cod";
-                param.Value = codAlmacen;
-                cmd.Parameters.Add(param);
-                var result = await cmd.ExecuteScalarAsync();
-                return Convert.ToInt32(result) > 0;
-            }
-            finally
-            {
-                if (!wasOpen) connection.Close();
-            }
+            var cs = _config.GetConnectionString("SCMaestrosConnection");
+            await using var conn = new SqlConnection(cs);
+            await conn.OpenAsync();
+            await using var cmd = new SqlCommand("SELECT COUNT(1) FROM dbo.almacenes WHERE cod_almacen = @cod", conn);
+            cmd.Parameters.AddWithValue("@cod", codAlmacen);
+            var result = await cmd.ExecuteScalarAsync();
+            return Convert.ToInt32(result) > 0;
         }
     }
 

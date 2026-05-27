@@ -106,7 +106,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 
-// Seedear datos iniciales (roles, permisos, usuario admin)
+// Aplicar migraciones pendientes y seedear datos iniciales
 using (var scope = app.Services.CreateScope())
 {
     var services = scope.ServiceProvider;
@@ -115,7 +115,10 @@ using (var scope = app.Services.CreateScope())
         var context = services.GetRequiredService<AppDbContext>();
         var userManager = services.GetRequiredService<UserManager<AppUser>>();
         var roleManager = services.GetRequiredService<RoleManager<IdentityRole>>();
-        
+
+        await context.Database.MigrateAsync();
+        Console.WriteLine("✅ Migraciones aplicadas correctamente");
+
         await DataSeeder.SeedAsync(context, userManager, roleManager);
         Console.WriteLine("✅ Datos iniciales cargados correctamente");
     }
