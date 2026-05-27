@@ -97,14 +97,14 @@ docker-compose -f docker-compose.prod.yml logs -f
 docker-compose -f docker-compose.prod.yml ps
 
 # Probar endpoint
-curl http://localhost:5053/api/auth/login
+curl http://210.17.1.54:5053/api/auth/login
 ```
 
 ## 🌐 Acceso desde la Red
 
 El servicio estará disponible en:
 - `http://172.30.159.208:5053` (desde tu red)
-- `http://localhost:5053` (desde el servidor)
+- `http://210.17.1.54:5053` (desde el servidor)
 - Swagger: `http://172.30.159.208:5053/swagger`
 
 ## 🔧 Comandos Útiles

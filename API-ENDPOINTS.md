@@ -1,8 +1,8 @@
 # 📘 SCNexus Core API - Documentación de Endpoints
 
-**Base URL:** `http://210.17.1.53:5053/api`
+**Base URL:** `http://210.17.1.253:5053/api`
 
-**Swagger:** `http://210.17.1.53:5053/swagger`
+**Swagger:** `http://210.17.1.253:5053/swagger`
 
 ---
 
@@ -579,10 +579,10 @@ Authorization: Bearer {token}
 ## 🚀 CORS
 
 Orígenes permitidos:
-- `http://localhost:3000`
-- `http://localhost:5053`
-- `http://210.17.1.53:3000`
-- `http://210.17.1.53:5053`
+- `http://210.17.1.54:3000`
+- `http://210.17.1.54:5053`
+- `http://210.17.1.253:3000`
+- `http://210.17.1.253:5053`
 
 ---
 
@@ -615,7 +615,7 @@ Orígenes permitidos:
 
 ```javascript
 // 1. Login
-const loginResponse = await fetch('http://210.17.1.53:5053/api/auth/login', {
+const loginResponse = await fetch('http://210.17.1.253:5053/api/auth/login', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({
@@ -628,7 +628,7 @@ const loginResponse = await fetch('http://210.17.1.53:5053/api/auth/login', {
 const { token } = await loginResponse.json();
 
 // 2. Obtener información del usuario
-const meResponse = await fetch('http://210.17.1.53:5053/api/auth/me', {
+const meResponse = await fetch('http://210.17.1.253:5053/api/auth/me', {
   headers: { 'Authorization': `Bearer ${token}` }
 });
 
@@ -641,7 +641,7 @@ console.log(user);
 ```javascript
 const userId = '832a3f7a-53a7-43de-9317-93d4d8ab45e5';
 
-const response = await fetch(`http://210.17.1.53:5053/api/users/${userId}/roles`, {
+const response = await fetch(`http://210.17.1.253:5053/api/users/${userId}/roles`, {
   method: 'POST',
   headers: {
     'Authorization': `Bearer ${token}`,
@@ -654,7 +654,7 @@ const response = await fetch(`http://210.17.1.53:5053/api/users/${userId}/roles`
 ### Asignar permiso a rol
 
 ```javascript
-const response = await fetch('http://210.17.1.53:5053/api/permissions/assign', {
+const response = await fetch('http://210.17.1.253:5053/api/permissions/assign', {
   method: 'POST',
   headers: {
     'Authorization': `Bearer ${token}`,

@@ -41,7 +41,7 @@ flowchart TB
 
     subgraph DESA[Ambiente Desarrollo / Pruebas]
         DESA_DB[DESA-MABUIOSBDD<br/>210.17.1.54<br/>Base de Datos]
-        DESA_APP[DESA-MABUIOSAPP<br/>210.17.1.53<br/>Aplicaciones]
+        DESA_APP[DESA-MABUIOSAPP<br/>210.17.1.54<br/>Aplicaciones]
         DESA_API[DESA-MABUIOSAPI<br/>210.17.1.55<br/>Backend Apps]
         DESA_VER[DESA-MABUIOSVER<br/>210.17.1.51<br/>Versionamiento]
     end

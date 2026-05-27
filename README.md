@@ -79,7 +79,7 @@ dotnet ef database update
 dotnet run
 ```
 
-La API estará disponible en: `http://localhost:5053`
+La API estará disponible en: `http://210.17.1.54:5053`
 
 ### 5. Probar
 
@@ -88,7 +88,7 @@ Ver ejemplos completos en [`TESTING.md`](./TESTING.md)
 **Login rápido:**
 
 ```powershell
-$response = Invoke-RestMethod -Uri "http://localhost:5053/api/auth/login" `
+$response = Invoke-RestMethod -Uri "http://210.17.1.54:5053/api/auth/login" `
     -Method Post `
     -Body (@{userName="admin"; password="Admin123!"; useActiveDirectory=$false} | ConvertTo-Json) `
     -ContentType "application/json"

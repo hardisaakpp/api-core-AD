@@ -2,7 +2,7 @@
 Write-Host "`nSCNexus Core API - Testing Script" -ForegroundColor Cyan
 Write-Host "=================================`n" -ForegroundColor Cyan
 
-$baseUrl = "http://localhost:5053/api"
+$baseUrl = "http://210.17.1.54:5053/api"
 
 # 1. LOGIN
 Write-Host "1. Iniciando sesion..." -ForegroundColor Cyan

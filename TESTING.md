@@ -14,7 +14,7 @@ El sistema crea automáticamente un usuario admin:
 ## 📌 Base URL
 
 ```
-http://localhost:5053/api
+http://210.17.1.54:5053/api
 ```
 
 ---
@@ -24,7 +24,7 @@ http://localhost:5053/api
 ### Request
 
 ```http
-POST http://localhost:5053/api/auth/login
+POST http://210.17.1.54:5053/api/auth/login
 Content-Type: application/json
 
 {
@@ -73,7 +73,7 @@ Content-Type: application/json
 ### PowerShell
 
 ```powershell
-$response = Invoke-RestMethod -Uri "http://localhost:5053/api/auth/login" -Method Post -Body (@{userName="admin"; password="Admin123!"; useActiveDirectory=$false} | ConvertTo-Json) -ContentType "application/json"
+$response = Invoke-RestMethod -Uri "http://210.17.1.54:5053/api/auth/login" -Method Post -Body (@{userName="admin"; password="Admin123!"; useActiveDirectory=$false} | ConvertTo-Json) -ContentType "application/json"
 $token = $response.token
 Write-Host "Token: $token"
 ```
@@ -85,7 +85,7 @@ Write-Host "Token: $token"
 ### Request
 
 ```http
-GET http://localhost:5053/api/auth/me
+GET http://210.17.1.54:5053/api/auth/me
 Authorization: Bearer <token>
 ```
 
@@ -114,7 +114,7 @@ Authorization: Bearer <token>
 
 ```powershell
 $headers = @{Authorization="Bearer $token"}
-Invoke-RestMethod -Uri "http://localhost:5053/api/auth/me" -Method Get -Headers $headers
+Invoke-RestMethod -Uri "http://210.17.1.54:5053/api/auth/me" -Method Get -Headers $headers
 ```
 
 ---
@@ -124,7 +124,7 @@ Invoke-RestMethod -Uri "http://localhost:5053/api/auth/me" -Method Get -Headers 
 ### Request
 
 ```http
-POST http://localhost:5053/api/auth/validate
+POST http://210.17.1.54:5053/api/auth/validate
 Content-Type: application/json
 
 {
@@ -163,7 +163,7 @@ Content-Type: application/json
 
 ```powershell
 $body = @{token=$token} | ConvertTo-Json
-Invoke-RestMethod -Uri "http://localhost:5053/api/auth/validate" -Method Post -Body $body -ContentType "application/json"
+Invoke-RestMethod -Uri "http://210.17.1.54:5053/api/auth/validate" -Method Post -Body $body -ContentType "application/json"
 ```
 
 ---
@@ -173,7 +173,7 @@ Invoke-RestMethod -Uri "http://localhost:5053/api/auth/validate" -Method Post -B
 ### Request
 
 ```http
-GET http://localhost:5053/api/permissions
+GET http://210.17.1.54:5053/api/permissions
 Authorization: Bearer <admin-token>
 ```
 
@@ -209,7 +209,7 @@ Authorization: Bearer <admin-token>
 
 ```powershell
 $headers = @{Authorization="Bearer $token"}
-Invoke-RestMethod -Uri "http://localhost:5053/api/permissions" -Method Get -Headers $headers
+Invoke-RestMethod -Uri "http://210.17.1.54:5053/api/permissions" -Method Get -Headers $headers
 ```
 
 ---
@@ -219,7 +219,7 @@ Invoke-RestMethod -Uri "http://localhost:5053/api/permissions" -Method Get -Head
 ### Request
 
 ```http
-POST http://localhost:5053/api/permissions
+POST http://210.17.1.54:5053/api/permissions
 Authorization: Bearer <admin-token>
 Content-Type: application/json
 
@@ -247,7 +247,7 @@ Content-Type: application/json
 ```powershell
 $headers = @{Authorization="Bearer $token"}
 $body = @{key="inventario.view"; description="Ver inventario"; module="inventario"} | ConvertTo-Json
-Invoke-RestMethod -Uri "http://localhost:5053/api/permissions" -Method Post -Headers $headers -Body $body -ContentType "application/json"
+Invoke-RestMethod -Uri "http://210.17.1.54:5053/api/permissions" -Method Post -Headers $headers -Body $body -ContentType "application/json"
 ```
 
 ---
@@ -257,7 +257,7 @@ Invoke-RestMethod -Uri "http://localhost:5053/api/permissions" -Method Post -Hea
 ### Request
 
 ```http
-POST http://localhost:5053/api/permissions/assign
+POST http://210.17.1.54:5053/api/permissions/assign
 Authorization: Bearer <admin-token>
 Content-Type: application/json
 
@@ -280,7 +280,7 @@ Content-Type: application/json
 ```powershell
 $headers = @{Authorization="Bearer $token"}
 $body = @{roleName="Contabilidad"; permissionId=9} | ConvertTo-Json
-Invoke-RestMethod -Uri "http://localhost:5053/api/permissions/assign" -Method Post -Headers $headers -Body $body -ContentType "application/json"
+Invoke-RestMethod -Uri "http://210.17.1.54:5053/api/permissions/assign" -Method Post -Headers $headers -Body $body -ContentType "application/json"
 ```
 
 ---
@@ -290,7 +290,7 @@ Invoke-RestMethod -Uri "http://localhost:5053/api/permissions/assign" -Method Po
 ### Request
 
 ```http
-GET http://localhost:5053/api/permissions/role/Contabilidad
+GET http://210.17.1.54:5053/api/permissions/role/Contabilidad
 Authorization: Bearer <admin-token>
 ```
 
@@ -319,7 +319,7 @@ Authorization: Bearer <admin-token>
 
 ```powershell
 $headers = @{Authorization="Bearer $token"}
-Invoke-RestMethod -Uri "http://localhost:5053/api/permissions/role/Contabilidad" -Method Get -Headers $headers
+Invoke-RestMethod -Uri "http://210.17.1.54:5053/api/permissions/role/Contabilidad" -Method Get -Headers $headers
 ```
 
 ---
@@ -329,7 +329,7 @@ Invoke-RestMethod -Uri "http://localhost:5053/api/permissions/role/Contabilidad"
 ### Request
 
 ```http
-DELETE http://localhost:5053/api/permissions/unassign
+DELETE http://210.17.1.54:5053/api/permissions/unassign
 Authorization: Bearer <admin-token>
 Content-Type: application/json
 
@@ -352,7 +352,7 @@ Content-Type: application/json
 ```powershell
 $headers = @{Authorization="Bearer $token"}
 $body = @{roleName="Contabilidad"; permissionId=9} | ConvertTo-Json
-Invoke-RestMethod -Uri "http://localhost:5053/api/permissions/unassign" -Method Delete -Headers $headers -Body $body -ContentType "application/json"
+Invoke-RestMethod -Uri "http://210.17.1.54:5053/api/permissions/unassign" -Method Delete -Headers $headers -Body $body -ContentType "application/json"
 ```
 
 ---
@@ -361,7 +361,7 @@ Invoke-RestMethod -Uri "http://localhost:5053/api/permissions/unassign" -Method 
 
 ```powershell
 # 1. Login
-$loginResponse = Invoke-RestMethod -Uri "http://localhost:5053/api/auth/login" `
+$loginResponse = Invoke-RestMethod -Uri "http://210.17.1.54:5053/api/auth/login" `
     -Method Post `
     -Body (@{userName="admin"; password="Admin123!"; useActiveDirectory=$false} | ConvertTo-Json) `
     -ContentType "application/json"
@@ -372,7 +372,7 @@ Write-Host "Token: $token`n" -ForegroundColor Cyan
 
 # 2. Obtener usuario actual
 $headers = @{Authorization="Bearer $token"}
-$meResponse = Invoke-RestMethod -Uri "http://localhost:5053/api/auth/me" -Method Get -Headers $headers
+$meResponse = Invoke-RestMethod -Uri "http://210.17.1.54:5053/api/auth/me" -Method Get -Headers $headers
 Write-Host "✅ Usuario actual:" -ForegroundColor Green
 Write-Host "   Username: $($meResponse.user.userName)" -ForegroundColor Yellow
 Write-Host "   Email: $($meResponse.user.email)" -ForegroundColor Yellow
@@ -380,7 +380,7 @@ Write-Host "   Roles: $($meResponse.user.roles -join ', ')" -ForegroundColor Yel
 Write-Host "   Permisos: $($meResponse.user.permissions.Count) permisos`n" -ForegroundColor Yellow
 
 # 3. Validar token
-$validateResponse = Invoke-RestMethod -Uri "http://localhost:5053/api/auth/validate" `
+$validateResponse = Invoke-RestMethod -Uri "http://210.17.1.54:5053/api/auth/validate" `
     -Method Post `
     -Body (@{token=$token} | ConvertTo-Json) `
     -ContentType "application/json"
@@ -388,7 +388,7 @@ Write-Host "✅ Token válido: $($validateResponse.isValid)" -ForegroundColor Gr
 Write-Host "   Mensaje: $($validateResponse.message)`n" -ForegroundColor Yellow
 
 # 4. Listar permisos
-$permissions = Invoke-RestMethod -Uri "http://localhost:5053/api/permissions" -Method Get -Headers $headers
+$permissions = Invoke-RestMethod -Uri "http://210.17.1.54:5053/api/permissions" -Method Get -Headers $headers
 Write-Host "✅ Total de permisos: $($permissions.Count)" -ForegroundColor Green
 $permissions | Select-Object -First 5 | Format-Table key, description, module
 
@@ -399,7 +399,7 @@ $newPermBody = @{
     module = "inventario"
 } | ConvertTo-Json
 
-$newPerm = Invoke-RestMethod -Uri "http://localhost:5053/api/permissions" `
+$newPerm = Invoke-RestMethod -Uri "http://210.17.1.54:5053/api/permissions" `
     -Method Post `
     -Headers $headers `
     -Body $newPermBody `
@@ -413,7 +413,7 @@ $assignBody = @{
     permissionId = $newPerm.id
 } | ConvertTo-Json
 
-$assignResult = Invoke-RestMethod -Uri "http://localhost:5053/api/permissions/assign" `
+$assignResult = Invoke-RestMethod -Uri "http://210.17.1.54:5053/api/permissions/assign" `
     -Method Post `
     -Headers $headers `
     -Body $assignBody `
@@ -422,7 +422,7 @@ $assignResult = Invoke-RestMethod -Uri "http://localhost:5053/api/permissions/as
 Write-Host "✅ $($assignResult.message)`n" -ForegroundColor Green
 
 # 7. Listar permisos del rol Contabilidad
-$rolePerms = Invoke-RestMethod -Uri "http://localhost:5053/api/permissions/role/Contabilidad" -Method Get -Headers $headers
+$rolePerms = Invoke-RestMethod -Uri "http://210.17.1.54:5053/api/permissions/role/Contabilidad" -Method Get -Headers $headers
 Write-Host "✅ Permisos del rol Contabilidad:" -ForegroundColor Green
 $rolePerms | Format-Table key, description, module
 

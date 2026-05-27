@@ -4,7 +4,7 @@
 Write-Host "`n🚀 SCNexus Core API - Testing Script" -ForegroundColor Cyan
 Write-Host "====================================`n" -ForegroundColor Cyan
 
-$baseUrl = "http://localhost:5053/api"
+$baseUrl = "http://210.17.1.54:5053/api"
 
 # Función para mostrar resultados
 function Show-Result {

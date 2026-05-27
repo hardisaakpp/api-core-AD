@@ -4,8 +4,8 @@
 
 This document provides complete API endpoint documentation for the SCNexus Core Identity Provider. All endpoints require JWT authentication unless explicitly marked as public.
 
-**Base URL:** `http://localhost:5053/api` (Development)  
-**Production URL:** `http://210.17.1.53:5053/api`
+**Base URL:** `http://210.17.1.54:5053/api` (Development)  
+**Production URL:** `http://210.17.1.253:5053/api`
 
 ## 🔐 Authentication Flow
 
@@ -101,7 +101,7 @@ import axios from 'axios';
 
 const login = async (username, password) => {
   try {
-    const response = await axios.post('http://localhost:5053/api/auth/login', {
+    const response = await axios.post('http://210.17.1.54:5053/api/auth/login', {
       username,
       password
     });
@@ -122,7 +122,7 @@ const login = async (username, password) => {
 **Fetch Example:**
 ```javascript
 const login = async (username, password) => {
-  const response = await fetch('http://localhost:5053/api/auth/login', {
+  const response = await fetch('http://210.17.1.54:5053/api/auth/login', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -183,7 +183,7 @@ Authorization: Bearer <your-jwt-token>
 const getCurrentUser = async () => {
   const token = localStorage.getItem('token');
   
-  const response = await axios.get('http://localhost:5053/api/auth/me', {
+  const response = await axios.get('http://210.17.1.54:5053/api/auth/me', {
     headers: {
       'Authorization': `Bearer ${token}`
     }
@@ -233,7 +233,7 @@ Authorization: Bearer <token-to-validate>
 const validateToken = async (token) => {
   try {
     const response = await axios.post(
-      'http://localhost:5053/api/auth/validate',
+      'http://210.17.1.54:5053/api/auth/validate',
       {},
       {
         headers: {
@@ -308,7 +308,7 @@ Authorization: Bearer <your-jwt-token>
 const getAllUsers = async () => {
   const token = localStorage.getItem('token');
   
-  const response = await axios.get('http://localhost:5053/api/users', {
+  const response = await axios.get('http://210.17.1.54:5053/api/users', {
     headers: {
       'Authorization': `Bearer ${token}`
     }
@@ -401,7 +401,7 @@ const createUser = async (userData) => {
   const token = localStorage.getItem('token');
   
   const response = await axios.post(
-    'http://localhost:5053/api/users',
+    'http://210.17.1.54:5053/api/users',
     userData,
     {
       headers: {
@@ -470,7 +470,7 @@ const createUser = async (userData) => {
 const deleteUser = async (userId) => {
   const token = localStorage.getItem('token');
   
-  await axios.delete(`http://localhost:5053/api/users/${userId}`, {
+  await axios.delete(`http://210.17.1.54:5053/api/users/${userId}`, {
     headers: {
       'Authorization': `Bearer ${token}`
     }
@@ -565,7 +565,7 @@ const deleteUser = async (userId) => {
 const getAllPermissions = async () => {
   const token = localStorage.getItem('token');
   
-  const response = await axios.get('http://localhost:5053/api/permissions', {
+  const response = await axios.get('http://210.17.1.54:5053/api/permissions', {
     headers: {
       'Authorization': `Bearer ${token}`
     }
@@ -653,7 +653,7 @@ const getRolePermissions = async (roleName) => {
   const token = localStorage.getItem('token');
   
   const response = await axios.get(
-    `http://localhost:5053/api/permissions/role/${roleName}`,
+    `http://210.17.1.54:5053/api/permissions/role/${roleName}`,
     {
       headers: {
         'Authorization': `Bearer ${token}`
@@ -704,7 +704,7 @@ const assignPermissionToRole = async (roleName, permissionKey) => {
   const token = localStorage.getItem('token');
   
   const response = await axios.post(
-    'http://localhost:5053/api/permissions/assign',
+    'http://210.17.1.54:5053/api/permissions/assign',
     { roleName, permissionKey },
     {
       headers: {
@@ -833,7 +833,7 @@ const syncActiveDirectory = async () => {
   const token = localStorage.getItem('token');
   
   const response = await axios.post(
-    'http://localhost:5053/api/admin/sync-ad',
+    'http://210.17.1.54:5053/api/admin/sync-ad',
     {},
     {
       headers: {
@@ -901,10 +901,10 @@ GET /api/auditlogs?pageNumber=1&pageSize=20&action=Login
 
 The API is configured to accept requests from the following origins:
 
-- `http://localhost:3000` (Vue dev server)
-- `http://localhost:5053` (API itself)
-- `http://210.17.1.53:3000` (Production frontend)
-- `http://210.17.1.53:5053` (Production API)
+- `http://210.17.1.54:3000` (Vue dev server)
+- `http://210.17.1.54:5053` (API itself)
+- `http://210.17.1.253:3000` (Production frontend)
+- `http://210.17.1.253:5053` (Production API)
 
 **Allowed Methods:** GET, POST, PUT, DELETE, OPTIONS  
 **Allowed Headers:** Authorization, Content-Type, Accept  
@@ -919,7 +919,7 @@ To handle CORS properly, configure Axios with credentials:
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: 'http://localhost:5053/api',
+  baseURL: 'http://210.17.1.54:5053/api',
   headers: {
     'Content-Type': 'application/json',
   },
@@ -1244,16 +1244,16 @@ export default router;
 
 ```bash
 # Login
-curl -X POST http://localhost:5053/api/auth/login \
+curl -X POST http://210.17.1.54:5053/api/auth/login \
   -H "Content-Type: application/json" \
   -d '{"username":"admin","password":"Admin123!"}'
 
 # Get current user (replace TOKEN with actual token)
-curl -X GET http://localhost:5053/api/auth/me \
+curl -X GET http://210.17.1.54:5053/api/auth/me \
   -H "Authorization: Bearer TOKEN"
 
 # Get all permissions
-curl -X GET http://localhost:5053/api/permissions \
+curl -X GET http://210.17.1.54:5053/api/permissions \
   -H "Authorization: Bearer TOKEN"
 ```
 
@@ -1266,7 +1266,7 @@ $body = @{
     password = "Admin123!"
 } | ConvertTo-Json
 
-$response = Invoke-RestMethod -Uri "http://localhost:5053/api/auth/login" `
+$response = Invoke-RestMethod -Uri "http://210.17.1.54:5053/api/auth/login" `
     -Method Post `
     -Body $body `
     -ContentType "application/json"
@@ -1278,7 +1278,7 @@ $headers = @{
     Authorization = "Bearer $token"
 }
 
-$user = Invoke-RestMethod -Uri "http://localhost:5053/api/auth/me" `
+$user = Invoke-RestMethod -Uri "http://210.17.1.54:5053/api/auth/me" `
     -Method Get `
     -Headers $headers
 
