@@ -17,6 +17,7 @@ namespace SCNexus.Core.API.Data
         public DbSet<AuditLog> AuditLogs { get; set; } = null!;
         public DbSet<Permission> Permissions { get; set; } = null!;
         public DbSet<RolePermission> RolePermissions { get; set; } = null!;
+        public DbSet<AspNetUserWarehouseAccess> UserWarehouseAccesses { get; set; } = null!;
 
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -40,6 +41,18 @@ namespace SCNexus.Core.API.Data
             // Índice único en Permission.Key
             modelBuilder.Entity<Permission>()
                 .HasIndex(p => p.Key)
+                .IsUnique();
+
+            // UserWarehouseAccess: FK hacia AspNetUsers, sin FK cross-database hacia SCMaestros
+            modelBuilder.Entity<AspNetUserWarehouseAccess>()
+                .HasOne(a => a.User)
+                .WithMany()
+                .HasForeignKey(a => a.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Evita duplicados: un usuario no puede tener el mismo almacén dos veces
+            modelBuilder.Entity<AspNetUserWarehouseAccess>()
+                .HasIndex(a => new { a.UserId, a.CodAlmacen })
                 .IsUnique();
 
             // Aplica snake_case a tablas, columnas, claves e índices

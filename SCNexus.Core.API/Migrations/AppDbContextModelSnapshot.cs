@@ -289,6 +289,54 @@ namespace SCNexus.Core.API.Migrations
                     b.ToTable("asp_net_users", (string)null);
                 });
 
+            modelBuilder.Entity("SCNexus.Core.API.Models.AspNetUserWarehouseAccess", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("id");
+
+                    b.Property<string>("AccesoAlmacen")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)")
+                        .HasColumnName("acceso_almacen");
+
+                    b.Property<string>("CodAlmacen")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)")
+                        .HasColumnName("cod_almacen");
+
+                    b.Property<DateTime>("FechaCreacion")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("fecha_creacion");
+
+                    b.Property<DateTime?>("FechaModificacion")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("fecha_modificacion");
+
+                    b.Property<string>("ModificadoPor")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)")
+                        .HasColumnName("modificado_por");
+
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("p_k_asp_net_user_warehouse_access");
+
+                    b.HasIndex("UserId", "CodAlmacen")
+                        .IsUnique()
+                        .HasDatabaseName("i_x_asp_net_user_warehouse_access_user_id_cod_almacen");
+
+                    b.ToTable("asp_net_user_warehouse_access");
+                });
+
             modelBuilder.Entity("SCNexus.Core.API.Models.AuditLog", b =>
                 {
                     b.Property<Guid>("Id")
@@ -433,6 +481,18 @@ namespace SCNexus.Core.API.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("f_k_asp_net_user_tokens__asp_net_users_user_id");
+                });
+
+            modelBuilder.Entity("SCNexus.Core.API.Models.AspNetUserWarehouseAccess", b =>
+                {
+                    b.HasOne("SCNexus.Core.API.Models.AppUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("f_k_asp_net_user_warehouse_access_asp_net_users_user_id");
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("SCNexus.Core.API.Models.RolePermission", b =>

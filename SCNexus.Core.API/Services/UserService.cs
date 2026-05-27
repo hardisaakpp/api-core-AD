@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 using SCNexus.Core.API.Models;
 
 namespace SCNexus.Core.API.Services
@@ -15,6 +16,29 @@ namespace SCNexus.Core.API.Services
         }
 
         public async Task<List<AppUser>> GetAllUsersAsync() => _userManager.Users.ToList();
+
+        public async Task<(List<AppUser> Users, int Total)> GetPagedUsersAsync(int page, int pageSize, string? search)
+        {
+            var query = _userManager.Users.AsQueryable();
+
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                var term = search.ToLower();
+                query = query.Where(u =>
+                    (u.UserName != null && u.UserName.ToLower().Contains(term)) ||
+                    (u.FullName != null && u.FullName.ToLower().Contains(term)) ||
+                    (u.Email != null && u.Email.ToLower().Contains(term)));
+            }
+
+            var total = await query.CountAsync();
+            var users = await query
+                .OrderBy(u => u.UserName)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync();
+
+            return (users, total);
+        }
 
         public async Task<AppUser?> GetByIdAsync(string id) => await _userManager.FindByIdAsync(id);
 

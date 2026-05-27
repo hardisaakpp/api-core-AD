@@ -22,13 +22,19 @@ namespace SCNexus.Core.API.Controllers
             _userService = userService;
         }
 
-        // GET: api/Users
+        // GET: api/Users?page=1&pageSize=20&search=carlos
         [HttpGet]
         [Authorize(Roles = "Admin")]
-        public async Task<IActionResult> GetAll()
+        public async Task<IActionResult> GetAll(
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = 20,
+            [FromQuery] string? search = null)
         {
-            var users = await _userService.GetAllUsersAsync();
-            return Ok(users);
+            page = Math.Max(1, page);
+            pageSize = Math.Clamp(pageSize, 1, 100);
+
+            var (users, total) = await _userService.GetPagedUsersAsync(page, pageSize, search);
+            return Ok(new { data = users, total });
         }
 
         // GET: api/Users/role/{roleName}

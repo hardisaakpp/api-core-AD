@@ -29,6 +29,7 @@ namespace SCNexus.Core.API.Controllers
         /// Listar todos los permisos
         /// </summary>
         [HttpGet]
+        [AllowAnonymous]
         public async Task<IActionResult> GetPermissions()
         {
             var permissions = await _context.Permissions
@@ -134,6 +135,7 @@ namespace SCNexus.Core.API.Controllers
         /// Remover un permiso de un rol
         /// </summary>
         [HttpDelete("unassign")]
+        [HttpPost("unassign")]
         public async Task<IActionResult> UnassignPermissionFromRole([FromBody] AssignPermissionRequest request)
         {
             return await UnassignPermissionInternal(request.RoleName, request.PermissionId);
@@ -143,6 +145,7 @@ namespace SCNexus.Core.API.Controllers
         /// Remover un permiso de un rol (ruta explícita)
         /// </summary>
         [HttpDelete("role/{roleName}/permission/{permissionId:int}")]
+        [HttpPost("role/{roleName}/permission/{permissionId:int}")]
         public async Task<IActionResult> UnassignPermissionFromRoleByRoute(string roleName, int permissionId)
         {
             return await UnassignPermissionInternal(roleName, permissionId);
