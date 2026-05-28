@@ -18,6 +18,9 @@ namespace SCNexus.Core.API.Models
 
         public List<string> Almacenes { get; set; } = [];
 
+        [MaxLength(50)]
+        public string? BodegaCentral { get; set; }
+
         public DateTime FechaCreacion { get; set; } = DateTime.UtcNow;
 
         public DateTime? FechaModificacion { get; set; }

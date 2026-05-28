@@ -1,11 +1,16 @@
 namespace SCNexus.Core.API.DTOs
 {
+    public class WarehouseGroupInfo
+    {
+        public string? Id { get; set; }
+        public string? Name { get; set; }
+    }
+
     public class WarehouseAccessInfo
     {
         public string CodAlmacen { get; set; } = string.Empty;
         public string AccesoAlmacen { get; set; } = string.Empty;
-        public string? WarehouseGroupId { get; set; }
-        public string? WarehouseGroupName { get; set; }
+        public List<WarehouseGroupInfo> WarehouseGroups { get; set; } = new();
     }
 
     /// <summary>

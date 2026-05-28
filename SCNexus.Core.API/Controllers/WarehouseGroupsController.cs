@@ -30,6 +30,32 @@ namespace SCNexus.Core.API.Controllers
                     grupo = g.Grupo,
                     descripcion = g.Descripcion,
                     almacenes = g.Almacenes,
+                    bodegaCentral = g.BodegaCentral,
+                    fechaCreacion = g.FechaCreacion,
+                    fechaModificacion = g.FechaModificacion,
+                    modificadoPor = g.ModificadoPor
+                })
+                .ToListAsync();
+
+            return Ok(items);
+        }
+
+        [HttpGet("search")]
+        public async Task<IActionResult> Search([FromQuery] string grupo)
+        {
+            if (string.IsNullOrWhiteSpace(grupo))
+                return BadRequest(new { message = "El parámetro 'grupo' es obligatorio." });
+
+            var items = await _context.WarehouseGroups
+                .Where(g => g.Grupo.ToLower().Contains(grupo.ToLower()))
+                .OrderBy(g => g.Grupo)
+                .Select(g => new
+                {
+                    id = g.Id,
+                    grupo = g.Grupo,
+                    descripcion = g.Descripcion,
+                    almacenes = g.Almacenes,
+                    bodegaCentral = g.BodegaCentral,
                     fechaCreacion = g.FechaCreacion,
                     fechaModificacion = g.FechaModificacion,
                     modificadoPor = g.ModificadoPor
@@ -50,6 +76,7 @@ namespace SCNexus.Core.API.Controllers
                     grupo = g.Grupo,
                     descripcion = g.Descripcion,
                     almacenes = g.Almacenes,
+                    bodegaCentral = g.BodegaCentral,
                     fechaCreacion = g.FechaCreacion,
                     fechaModificacion = g.FechaModificacion,
                     modificadoPor = g.ModificadoPor
@@ -71,17 +98,24 @@ namespace SCNexus.Core.API.Controllers
             if (request.Almacenes == null || request.Almacenes.Count == 0)
                 return BadRequest(new { message = "Debes agregar al menos un almacén." });
 
+            var nombreTrim = request.Grupo.Trim();
+            var duplicate = await _context.WarehouseGroups
+                .AnyAsync(g => g.Grupo.ToLower() == nombreTrim.ToLower());
+            if (duplicate)
+                return BadRequest(new { message = $"Ya existe un grupo con el nombre '{nombreTrim}'." });
+
             var caller = User.FindFirstValue(ClaimTypes.Name) ?? User.FindFirstValue(ClaimTypes.Email);
 
             var grupo = new WarehouseGroup
             {
-                Grupo = request.Grupo.Trim(),
+                Grupo = nombreTrim,
                 Descripcion = request.Descripcion?.Trim(),
                 Almacenes = request.Almacenes
                     .Where(c => !string.IsNullOrWhiteSpace(c))
                     .Select(c => c.Trim().ToUpper())
                     .Distinct()
                     .ToList(),
+                BodegaCentral = string.IsNullOrWhiteSpace(request.BodegaCentral) ? null : request.BodegaCentral.Trim().ToUpper(),
                 FechaCreacion = DateTime.UtcNow,
                 ModificadoPor = caller
             };
@@ -95,6 +129,7 @@ namespace SCNexus.Core.API.Controllers
                 grupo = grupo.Grupo,
                 descripcion = grupo.Descripcion,
                 almacenes = grupo.Almacenes,
+                bodegaCentral = grupo.BodegaCentral,
                 fechaCreacion = grupo.FechaCreacion,
                 modificadoPor = grupo.ModificadoPor
             });
@@ -109,19 +144,26 @@ namespace SCNexus.Core.API.Controllers
             if (request.Almacenes == null || request.Almacenes.Count == 0)
                 return BadRequest(new { message = "Debes agregar al menos un almacén." });
 
+            var nombreTrimUpd = request.Grupo.Trim();
+            var duplicateUpd = await _context.WarehouseGroups
+                .AnyAsync(g => g.Id != id && g.Grupo.ToLower() == nombreTrimUpd.ToLower());
+            if (duplicateUpd)
+                return BadRequest(new { message = $"Ya existe un grupo con el nombre '{nombreTrimUpd}'." });
+
             var grupo = await _context.WarehouseGroups.FindAsync(id);
             if (grupo == null)
                 return NotFound(new { message = "Grupo no encontrado." });
 
             var caller = User.FindFirstValue(ClaimTypes.Name) ?? User.FindFirstValue(ClaimTypes.Email);
 
-            grupo.Grupo = request.Grupo.Trim();
+            grupo.Grupo = nombreTrimUpd;
             grupo.Descripcion = request.Descripcion?.Trim();
             grupo.Almacenes = request.Almacenes
                 .Where(c => !string.IsNullOrWhiteSpace(c))
                 .Select(c => c.Trim().ToUpper())
                 .Distinct()
                 .ToList();
+            grupo.BodegaCentral = string.IsNullOrWhiteSpace(request.BodegaCentral) ? null : request.BodegaCentral.Trim().ToUpper();
             grupo.FechaModificacion = DateTime.UtcNow;
             grupo.ModificadoPor = caller;
 
@@ -133,6 +175,7 @@ namespace SCNexus.Core.API.Controllers
                 grupo = grupo.Grupo,
                 descripcion = grupo.Descripcion,
                 almacenes = grupo.Almacenes,
+                bodegaCentral = grupo.BodegaCentral,
                 fechaCreacion = grupo.FechaCreacion,
                 fechaModificacion = grupo.FechaModificacion,
                 modificadoPor = grupo.ModificadoPor
@@ -160,5 +203,6 @@ namespace SCNexus.Core.API.Controllers
         public string Grupo { get; set; } = string.Empty;
         public string? Descripcion { get; set; }
         public List<string> Almacenes { get; set; } = [];
+        public string? BodegaCentral { get; set; }
     }
 }

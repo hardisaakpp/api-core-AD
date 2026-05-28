@@ -107,17 +107,30 @@ namespace SCNexus.Core.API.Services
         /// </summary>
         public async Task<List<WarehouseAccessInfo>> GetUserWarehouseAccessesAsync(string userId)
         {
-            return await _context.UserWarehouseAccesses
+            var rows = await _context.UserWarehouseAccesses
                 .Where(w => w.UserId == userId)
                 .Include(w => w.WarehouseGroup)
-                .Select(w => new WarehouseAccessInfo
+                .Select(w => new
                 {
-                    CodAlmacen = w.CodAlmacen,
-                    AccesoAlmacen = w.AccesoAlmacen,
-                    WarehouseGroupId = w.WarehouseGroupId.HasValue ? w.WarehouseGroupId.Value.ToString() : null,
-                    WarehouseGroupName = w.WarehouseGroup != null ? w.WarehouseGroup.Grupo : null
+                    w.CodAlmacen,
+                    w.AccesoAlmacen,
+                    GroupId = w.WarehouseGroupId.HasValue ? w.WarehouseGroupId.Value.ToString() : null,
+                    GroupName = w.WarehouseGroup != null ? w.WarehouseGroup.Grupo : null
                 })
                 .ToListAsync();
+
+            return rows
+                .GroupBy(w => new { w.CodAlmacen, w.AccesoAlmacen })
+                .Select(g => new WarehouseAccessInfo
+                {
+                    CodAlmacen = g.Key.CodAlmacen,
+                    AccesoAlmacen = g.Key.AccesoAlmacen,
+                    WarehouseGroups = g
+                        .Where(w => w.GroupId != null)
+                        .Select(w => new WarehouseGroupInfo { Id = w.GroupId, Name = w.GroupName })
+                        .ToList()
+                })
+                .ToList();
         }
 
         /// <summary>

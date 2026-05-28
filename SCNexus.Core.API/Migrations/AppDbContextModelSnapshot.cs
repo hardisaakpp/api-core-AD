@@ -446,6 +446,11 @@ namespace SCNexus.Core.API.Migrations
                         .HasColumnType("nvarchar(max)")
                         .HasColumnName("almacenes");
 
+                    b.Property<string>("BodegaCentral")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)")
+                        .HasColumnName("bodega_central");
+
                     b.Property<string>("Descripcion")
                         .HasMaxLength(255)
                         .HasColumnType("nvarchar(255)")
