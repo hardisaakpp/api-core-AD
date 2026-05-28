@@ -18,6 +18,7 @@ namespace SCNexus.Core.API.Data
         public DbSet<Permission> Permissions { get; set; } = null!;
         public DbSet<RolePermission> RolePermissions { get; set; } = null!;
         public DbSet<AspNetUserWarehouseAccess> UserWarehouseAccesses { get; set; } = null!;
+        public DbSet<WarehouseGroup> WarehouseGroups { get; set; } = null!;
 
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -54,6 +55,15 @@ namespace SCNexus.Core.API.Data
             modelBuilder.Entity<AspNetUserWarehouseAccess>()
                 .HasIndex(a => new { a.UserId, a.CodAlmacen })
                 .IsUnique();
+
+            // WarehouseGroup.Almacenes almacenado como JSON en columna nvarchar(max)
+            modelBuilder.Entity<WarehouseGroup>()
+                .Property(g => g.Almacenes)
+                .HasConversion(
+                    v => System.Text.Json.JsonSerializer.Serialize(v, (System.Text.Json.JsonSerializerOptions?)null),
+                    v => System.Text.Json.JsonSerializer.Deserialize<List<string>>(v, (System.Text.Json.JsonSerializerOptions?)null) ?? new List<string>()
+                )
+                .HasColumnType("nvarchar(max)");
 
             // Aplica snake_case a tablas, columnas, claves e índices
             foreach (var entity in modelBuilder.Model.GetEntityTypes())
