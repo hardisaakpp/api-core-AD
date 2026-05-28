@@ -1,5 +1,13 @@
 namespace SCNexus.Core.API.DTOs
 {
+    public class WarehouseAccessInfo
+    {
+        public string CodAlmacen { get; set; } = string.Empty;
+        public string AccesoAlmacen { get; set; } = string.Empty;
+        public string? WarehouseGroupId { get; set; }
+        public string? WarehouseGroupName { get; set; }
+    }
+
     /// <summary>
     /// Respuesta del endpoint /auth/login
     /// </summary>
@@ -21,6 +29,7 @@ namespace SCNexus.Core.API.DTOs
         public string FullName { get; set; } = string.Empty;
         public List<string> Roles { get; set; } = new();
         public List<string> Permissions { get; set; } = new();
+        public List<WarehouseAccessInfo> WarehouseAccesses { get; set; } = new();
     }
 
     /// <summary>

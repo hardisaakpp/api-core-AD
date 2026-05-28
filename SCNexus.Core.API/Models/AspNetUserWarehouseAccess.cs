@@ -21,6 +21,8 @@ namespace SCNexus.Core.API.Models
         [MaxLength(50)]
         public string AccesoAlmacen { get; set; } = string.Empty;
 
+        public Guid? WarehouseGroupId { get; set; }
+
         public DateTime FechaCreacion { get; set; } = DateTime.UtcNow;
 
         public DateTime? FechaModificacion { get; set; }
@@ -28,7 +30,8 @@ namespace SCNexus.Core.API.Models
         [MaxLength(256)]
         public string? ModificadoPor { get; set; }
 
-        // Navigation property
+        // Navigation properties
         public AppUser User { get; set; } = null!;
+        public WarehouseGroup? WarehouseGroup { get; set; }
     }
 }

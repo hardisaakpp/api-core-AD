@@ -22,6 +22,15 @@ namespace SCNexus.Core.API.Controllers
             _userService = userService;
         }
 
+        // GET: api/Users/list — minimal list for comboboxes (id, fullName, email)
+        [HttpGet("list")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> GetList()
+        {
+            var users = await _userService.GetUsersForComboboxAsync();
+            return Ok(users);
+        }
+
         // GET: api/Users?page=1&pageSize=20&search=carlos
         [HttpGet]
         [Authorize(Roles = "Admin")]

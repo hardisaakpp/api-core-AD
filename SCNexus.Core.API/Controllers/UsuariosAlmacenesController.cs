@@ -28,6 +28,7 @@ namespace SCNexus.Core.API.Controllers
         {
             var items = await _context.UserWarehouseAccesses
                 .Include(a => a.User)
+                .Include(a => a.WarehouseGroup)
                 .OrderBy(a => a.User.UserName)
                 .ThenBy(a => a.CodAlmacen)
                 .Select(a => new
@@ -38,6 +39,8 @@ namespace SCNexus.Core.API.Controllers
                     fullName = a.User.FullName,
                     codAlmacen = a.CodAlmacen,
                     accesoAlmacen = a.AccesoAlmacen,
+                    grupoId = a.WarehouseGroupId,
+                    grupoNombre = a.WarehouseGroup != null ? a.WarehouseGroup.Grupo : null,
                     fechaCreacion = a.FechaCreacion,
                     modificadoPor = a.ModificadoPor
                 })
@@ -58,6 +61,7 @@ namespace SCNexus.Core.API.Controllers
                 return Forbid();
 
             var items = await _context.UserWarehouseAccesses
+                .Include(a => a.WarehouseGroup)
                 .Where(a => a.UserId == userId)
                 .OrderBy(a => a.CodAlmacen)
                 .Select(a => new
@@ -66,6 +70,8 @@ namespace SCNexus.Core.API.Controllers
                     userId = a.UserId,
                     codAlmacen = a.CodAlmacen,
                     accesoAlmacen = a.AccesoAlmacen,
+                    grupoId = a.WarehouseGroupId,
+                    grupoNombre = a.WarehouseGroup != null ? a.WarehouseGroup.Grupo : null,
                     fechaCreacion = a.FechaCreacion,
                     modificadoPor = a.ModificadoPor
                 })
@@ -113,9 +119,11 @@ namespace SCNexus.Core.API.Controllers
                 return BadRequest(new { message = $"El código de almacén '{codAlmacen}' no existe en el maestro de almacenes (SCMaestros)." });
 
             var duplicate = await _context.UserWarehouseAccesses
-                .AnyAsync(a => a.UserId == request.UserId && a.CodAlmacen == codAlmacen);
+                .AnyAsync(a => a.UserId == request.UserId
+                            && a.CodAlmacen == codAlmacen
+                            && a.WarehouseGroupId == request.WarehouseGroupId);
             if (duplicate)
-                return BadRequest(new { message = "El usuario ya tiene acceso a ese almacén." });
+                return BadRequest(new { message = "El usuario ya tiene ese acceso con ese grupo de almacén." });
 
             var caller = User.FindFirstValue(ClaimTypes.Name) ?? User.FindFirstValue(ClaimTypes.Email);
 
@@ -124,6 +132,7 @@ namespace SCNexus.Core.API.Controllers
                 UserId = request.UserId,
                 CodAlmacen = codAlmacen,
                 AccesoAlmacen = request.AccesoAlmacen.Trim(),
+                WarehouseGroupId = request.WarehouseGroupId,
                 FechaCreacion = DateTime.UtcNow,
                 ModificadoPor = caller
             };
@@ -132,6 +141,25 @@ namespace SCNexus.Core.API.Controllers
             await _context.SaveChangesAsync();
 
             return Ok(new { id = entry.Id, message = "Asignación creada correctamente." });
+        }
+
+        [HttpPut("{id:guid}")]
+        public async Task<IActionResult> Update(Guid id, [FromBody] UpdateUsuarioAlmacenRequest request)
+        {
+            var entry = await _context.UserWarehouseAccesses.FindAsync(id);
+            if (entry == null)
+                return NotFound(new { message = "Asignación no encontrada." });
+
+            if (string.IsNullOrWhiteSpace(request.AccesoAlmacen))
+                return BadRequest(new { message = "AccesoAlmacen es requerido." });
+
+            var caller = User.FindFirstValue(ClaimTypes.Name) ?? User.FindFirstValue(ClaimTypes.Email);
+            entry.AccesoAlmacen = request.AccesoAlmacen.Trim();
+            entry.WarehouseGroupId = request.WarehouseGroupId;
+            entry.ModificadoPor = caller;
+
+            await _context.SaveChangesAsync();
+            return Ok(new { message = "Asignación actualizada correctamente." });
         }
 
         [HttpDelete("{id:guid}")]
@@ -164,5 +192,12 @@ namespace SCNexus.Core.API.Controllers
         public string UserId { get; set; } = string.Empty;
         public string CodAlmacen { get; set; } = string.Empty;
         public string AccesoAlmacen { get; set; } = string.Empty;
+        public Guid? WarehouseGroupId { get; set; }
+    }
+
+    public class UpdateUsuarioAlmacenRequest
+    {
+        public string AccesoAlmacen { get; set; } = string.Empty;
+        public Guid? WarehouseGroupId { get; set; }
     }
 }

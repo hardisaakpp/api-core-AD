@@ -9,10 +9,9 @@ RUN dotnet publish -c Release -o out
 FROM mcr.microsoft.com/dotnet/aspnet:8.0
 WORKDIR /app
 
-# Instalar librerías LDAP necesarias para System.DirectoryServices.Protocols
+# Instalar librerías LDAP necesarias para System.DirectoryServices.Protocols (Debian 12)
 RUN apt-get update && \
-    apt-get install -y libldap2 && \
-    ln -s /usr/lib/x86_64-linux-gnu/libldap-2.5.so.0 /usr/lib/x86_64-linux-gnu/libldap-2.5.so.0.so 2>/dev/null || true && \
+    apt-get install -y libldap-2.5-0 libldap-common && \
     ldconfig && \
     rm -rf /var/lib/apt/lists/*
 

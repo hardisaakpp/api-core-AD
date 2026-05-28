@@ -51,9 +51,9 @@ namespace SCNexus.Core.API.Data
                 .HasForeignKey(a => a.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
 
-            // Evita duplicados: un usuario no puede tener el mismo almacén dos veces
+            // Evita duplicados: un usuario no puede tener el mismo almacén con el mismo grupo dos veces
             modelBuilder.Entity<AspNetUserWarehouseAccess>()
-                .HasIndex(a => new { a.UserId, a.CodAlmacen })
+                .HasIndex(a => new { a.UserId, a.CodAlmacen, a.WarehouseGroupId })
                 .IsUnique();
 
             // WarehouseGroup.Almacenes almacenado como JSON en columna nvarchar(max)

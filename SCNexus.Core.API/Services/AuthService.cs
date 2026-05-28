@@ -6,6 +6,7 @@ using SCNexus.Core.API.Models;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 
 namespace SCNexus.Core.API.Services
@@ -29,13 +30,16 @@ namespace SCNexus.Core.API.Services
             _config = config;
         }
 
+        private static readonly JsonSerializerOptions _camelCaseOptions = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
+
         /// <summary>
-        /// Genera un JWT con roles y permisos del usuario
+        /// Genera un JWT con roles, permisos y accesos a almacenes del usuario
         /// </summary>
         public async Task<LoginResponse> GenerateTokenAsync(AppUser user)
         {
             var roles = await _userManager.GetRolesAsync(user);
             var permissions = await GetUserPermissionsAsync(user.Id);
+            var warehouseAccesses = await GetUserWarehouseAccessesAsync(user.Id);
 
             var authClaims = new List<Claim>
             {
@@ -55,6 +59,12 @@ namespace SCNexus.Core.API.Services
             foreach (var permission in permissions)
             {
                 authClaims.Add(new Claim("permission", permission));
+            }
+
+            // Añadir accesos a almacenes como claims JSON
+            foreach (var wa in warehouseAccesses)
+            {
+                authClaims.Add(new Claim("warehouse_access", JsonSerializer.Serialize(wa, _camelCaseOptions)));
             }
 
             var jwtKey = _config["Jwt:Key"] ?? throw new InvalidOperationException("JWT Key not configured");
@@ -86,9 +96,28 @@ namespace SCNexus.Core.API.Services
                     Email = user.Email ?? string.Empty,
                     FullName = user.FullName,
                     Roles = roles.ToList(),
-                    Permissions = permissions
+                    Permissions = permissions,
+                    WarehouseAccesses = warehouseAccesses
                 }
             };
+        }
+
+        /// <summary>
+        /// Obtiene los accesos a almacenes asignados al usuario
+        /// </summary>
+        public async Task<List<WarehouseAccessInfo>> GetUserWarehouseAccessesAsync(string userId)
+        {
+            return await _context.UserWarehouseAccesses
+                .Where(w => w.UserId == userId)
+                .Include(w => w.WarehouseGroup)
+                .Select(w => new WarehouseAccessInfo
+                {
+                    CodAlmacen = w.CodAlmacen,
+                    AccesoAlmacen = w.AccesoAlmacen,
+                    WarehouseGroupId = w.WarehouseGroupId.HasValue ? w.WarehouseGroupId.Value.ToString() : null,
+                    WarehouseGroupName = w.WarehouseGroup != null ? w.WarehouseGroup.Grupo : null
+                })
+                .ToListAsync();
         }
 
         /// <summary>
@@ -154,6 +183,7 @@ namespace SCNexus.Core.API.Services
 
                 var roles = await _userManager.GetRolesAsync(user);
                 var permissions = await GetUserPermissionsAsync(user.Id);
+                var warehouseAccesses = await GetUserWarehouseAccessesAsync(user.Id);
 
                 return new ValidateTokenResponse
                 {
@@ -166,7 +196,8 @@ namespace SCNexus.Core.API.Services
                         Email = user.Email ?? string.Empty,
                         FullName = user.FullName,
                         Roles = roles.ToList(),
-                        Permissions = permissions
+                        Permissions = permissions,
+                        WarehouseAccesses = warehouseAccesses
                     }
                 };
             }
@@ -193,6 +224,7 @@ namespace SCNexus.Core.API.Services
 
             var roles = await _userManager.GetRolesAsync(user);
             var permissions = await GetUserPermissionsAsync(user.Id);
+            var warehouseAccesses = await GetUserWarehouseAccessesAsync(user.Id);
 
             return new UserInfo
             {
@@ -201,7 +233,8 @@ namespace SCNexus.Core.API.Services
                 Email = user.Email ?? string.Empty,
                 FullName = user.FullName,
                 Roles = roles.ToList(),
-                Permissions = permissions
+                Permissions = permissions,
+                WarehouseAccesses = warehouseAccesses
             };
         }
     }

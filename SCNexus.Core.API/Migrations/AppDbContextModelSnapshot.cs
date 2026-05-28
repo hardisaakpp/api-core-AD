@@ -327,12 +327,20 @@ namespace SCNexus.Core.API.Migrations
                         .HasColumnType("nvarchar(450)")
                         .HasColumnName("user_id");
 
+                    b.Property<Guid?>("WarehouseGroupId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("warehouse_group_id");
+
                     b.HasKey("Id")
                         .HasName("p_k_asp_net_user_warehouse_access");
 
-                    b.HasIndex("UserId", "CodAlmacen")
+                    b.HasIndex("WarehouseGroupId")
+                        .HasDatabaseName("i_x_asp_net_user_warehouse_access_warehouse_group_id");
+
+                    b.HasIndex("UserId", "CodAlmacen", "WarehouseGroupId")
                         .IsUnique()
-                        .HasDatabaseName("i_x_asp_net_user_warehouse_access_user_id_cod_almacen");
+                        .HasDatabaseName("i_x_asp_net_user_warehouse_access_user_id_cod_almacen_warehouse_group_id")
+                        .HasFilter("[warehouse_group_id] IS NOT NULL");
 
                     b.ToTable("asp_net_user_warehouse_access");
                 });
@@ -534,7 +542,14 @@ namespace SCNexus.Core.API.Migrations
                         .IsRequired()
                         .HasConstraintName("f_k_asp_net_user_warehouse_access_asp_net_users_user_id");
 
+                    b.HasOne("SCNexus.Core.API.Models.WarehouseGroup", "WarehouseGroup")
+                        .WithMany()
+                        .HasForeignKey("WarehouseGroupId")
+                        .HasConstraintName("f_k_asp_net_user_warehouse_access_asp_net_warehouse_group_warehouse_group_id");
+
                     b.Navigation("User");
+
+                    b.Navigation("WarehouseGroup");
                 });
 
             modelBuilder.Entity("SCNexus.Core.API.Models.RolePermission", b =>

@@ -41,12 +41,19 @@ namespace SCNexus.Core.API.Services
                 return 0;
             }
 
-                var useLdaps = bool.TryParse(_config["Ldap:UseLdaps"], out var ssl) && ssl;
-                var ldapIdentifier = new LdapDirectoryIdentifier(host, port);
-                using var conn = new LdapConnection(ldapIdentifier)
-                {
-                    AuthType = AuthType.Basic
-                };
+            var useLdaps = bool.TryParse(_config["Ldap:UseLdaps"], out var ssl) && ssl;
+            LdapDirectoryIdentifier ldapIdentifier;
+            try
+            {
+                ldapIdentifier = new LdapDirectoryIdentifier(host, port);
+            }
+            catch (Exception ex) when (ex is DllNotFoundException || ex is TypeInitializationException)
+            {
+                _logger.LogError(ex, "LDAP native library not available (libldap). Cannot sync users.");
+                return 0;
+            }
+
+            using var conn = new LdapConnection(ldapIdentifier) { AuthType = AuthType.Basic };
             try
             {
                 conn.SessionOptions.ProtocolVersion = 3;
@@ -149,16 +156,23 @@ namespace SCNexus.Core.API.Services
             }
 
             var useLdaps = bool.TryParse(_config["Ldap:UseLdaps"], out var ssl) && ssl;
-            var ldapIdentifier = new LdapDirectoryIdentifier(host, port);
-            using var conn = new LdapConnection(ldapIdentifier)
+            LdapDirectoryIdentifier ldapIdentifier;
+            try
             {
-                AuthType = AuthType.Basic
-            };
-            
+                ldapIdentifier = new LdapDirectoryIdentifier(host, port);
+            }
+            catch (Exception ex) when (ex is DllNotFoundException || ex is TypeInitializationException)
+            {
+                _logger.LogError(ex, "LDAP native library not available (libldap). Cannot authenticate via Active Directory.");
+                return null;
+            }
+
+            var ldapTimeout = TimeSpan.FromSeconds(10);
+            using var conn = new LdapConnection(ldapIdentifier) { AuthType = AuthType.Basic };
             try
             {
                 conn.SessionOptions.ProtocolVersion = 3;
-                conn.Timeout = TimeSpan.FromSeconds(30);
+                conn.Timeout = ldapTimeout;
                 // Primero hacer bind con el usuario de servicio para buscar al usuario
                 var serviceCred = new NetworkCredential(bindDn, bindPassword);
                 conn.Bind(serviceCred);
@@ -172,12 +186,12 @@ namespace SCNexus.Core.API.Services
             // Buscar el usuario en LDAP
             var searchFilter = $"(&{userFilter}(|(sAMAccountName={userName})(mail={userName})(userPrincipalName={userName})))";
             var searchRequest = new SearchRequest(searchBase, searchFilter, SearchScope.Subtree, new[] { "sAMAccountName", "mail", "displayName", "userPrincipalName", "distinguishedName", "userAccountControl" });
-            searchRequest.TimeLimit = TimeSpan.FromSeconds(30);
-            
+            searchRequest.TimeLimit = ldapTimeout;
+
             SearchResponse? searchResponse = null;
             try
             {
-                searchResponse = (SearchResponse)conn.SendRequest(searchRequest);
+                searchResponse = (SearchResponse)conn.SendRequest(searchRequest, ldapTimeout);
             }
             catch (Exception ex)
             {

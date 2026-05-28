@@ -17,6 +17,21 @@ namespace SCNexus.Core.API.Services
 
         public async Task<List<AppUser>> GetAllUsersAsync() => _userManager.Users.ToList();
 
+        public async Task<List<UserComboboxItem>> GetUsersForComboboxAsync()
+        {
+            return await _userManager.Users
+                .OrderBy(u => u.FullName)
+                .Select(u => new UserComboboxItem { Id = u.Id, FullName = u.FullName, Email = u.Email })
+                .ToListAsync();
+        }
+
+        public record UserComboboxItem
+        {
+            public string Id { get; init; } = string.Empty;
+            public string FullName { get; init; } = string.Empty;
+            public string? Email { get; init; }
+        }
+
         public async Task<(List<AppUser> Users, int Total)> GetPagedUsersAsync(int page, int pageSize, string? search)
         {
             var query = _userManager.Users.AsQueryable();
