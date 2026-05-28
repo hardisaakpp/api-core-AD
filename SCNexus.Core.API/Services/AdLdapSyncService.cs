@@ -57,6 +57,7 @@ namespace SCNexus.Core.API.Services
             try
             {
                 conn.SessionOptions.ProtocolVersion = 3;
+                conn.SessionOptions.SecureSocketLayer = useLdaps;
                 conn.Timeout = TimeSpan.FromSeconds(30);
                 var cred = new NetworkCredential(bindDn, bindPassword);
                 conn.Bind(cred);
@@ -172,6 +173,7 @@ namespace SCNexus.Core.API.Services
             try
             {
                 conn.SessionOptions.ProtocolVersion = 3;
+                conn.SessionOptions.SecureSocketLayer = useLdaps;
                 conn.Timeout = ldapTimeout;
                 // Primero hacer bind con el usuario de servicio para buscar al usuario
                 var serviceCred = new NetworkCredential(bindDn, bindPassword);
@@ -230,6 +232,7 @@ namespace SCNexus.Core.API.Services
             try
             {
                 authConn.SessionOptions.ProtocolVersion = 3;
+                authConn.SessionOptions.SecureSocketLayer = useLdaps;
                 authConn.Timeout = TimeSpan.FromSeconds(30);
                 // Intentar bind con el DN del usuario y su contraseña
                 var userCred = new NetworkCredential(userDn, password);
@@ -312,12 +315,14 @@ namespace SCNexus.Core.API.Services
                 return (false, "LDAP no está configurado", null);
             }
 
+            var useLdaps = bool.TryParse(_config["Ldap:UseLdaps"], out var ssl2) && ssl2;
             var ldapIdentifier = new LdapDirectoryIdentifier(host, port);
             using var conn = new LdapConnection(ldapIdentifier) { AuthType = AuthType.Basic };
 
             try
             {
                 conn.SessionOptions.ProtocolVersion = 3;
+                conn.SessionOptions.SecureSocketLayer = useLdaps;
                 conn.Timeout = TimeSpan.FromSeconds(30);
                 var cred = new NetworkCredential(bindDn, bindPassword);
                 conn.Bind(cred);

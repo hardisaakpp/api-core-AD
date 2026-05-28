@@ -42,6 +42,7 @@ namespace SCNexus.Core.API.Controllers
                     grupoId = a.WarehouseGroupId,
                     grupoNombre = a.WarehouseGroup != null ? a.WarehouseGroup.Grupo : null,
                     fechaCreacion = a.FechaCreacion,
+                    fechaModificacion = a.FechaModificacion,
                     modificadoPor = a.ModificadoPor
                 })
                 .ToListAsync();
@@ -73,6 +74,7 @@ namespace SCNexus.Core.API.Controllers
                     grupoId = a.WarehouseGroupId,
                     grupoNombre = a.WarehouseGroup != null ? a.WarehouseGroup.Grupo : null,
                     fechaCreacion = a.FechaCreacion,
+                    fechaModificacion = a.FechaModificacion,
                     modificadoPor = a.ModificadoPor
                 })
                 .ToListAsync();
@@ -127,13 +129,15 @@ namespace SCNexus.Core.API.Controllers
 
             var caller = User.FindFirstValue(ClaimTypes.Name) ?? User.FindFirstValue(ClaimTypes.Email);
 
+            var now = DateTime.UtcNow;
             var entry = new AspNetUserWarehouseAccess
             {
                 UserId = request.UserId,
                 CodAlmacen = codAlmacen,
                 AccesoAlmacen = request.AccesoAlmacen.Trim(),
                 WarehouseGroupId = request.WarehouseGroupId,
-                FechaCreacion = DateTime.UtcNow,
+                FechaCreacion = now,
+                FechaModificacion = now,
                 ModificadoPor = caller
             };
 
@@ -153,9 +157,40 @@ namespace SCNexus.Core.API.Controllers
             if (string.IsNullOrWhiteSpace(request.AccesoAlmacen))
                 return BadRequest(new { message = "AccesoAlmacen es requerido." });
 
+            var newUserId = string.IsNullOrWhiteSpace(request.UserId) ? entry.UserId : request.UserId.Trim();
+            var newCodAlmacen = string.IsNullOrWhiteSpace(request.CodAlmacen) ? entry.CodAlmacen : request.CodAlmacen.Trim().ToUpper();
+
+            if (newUserId != entry.UserId)
+            {
+                var userExists = await _context.Users.AnyAsync(u => u.Id == newUserId);
+                if (!userExists)
+                    return NotFound(new { message = "Usuario no encontrado." });
+            }
+
+            if (newCodAlmacen != entry.CodAlmacen)
+            {
+                var almacenValido = await AlmacenExisteEnScMaestros(newCodAlmacen);
+                if (!almacenValido)
+                    return BadRequest(new { message = $"El código de almacén '{newCodAlmacen}' no existe en el maestro de almacenes (SCMaestros)." });
+            }
+
+            if (newUserId != entry.UserId || newCodAlmacen != entry.CodAlmacen || request.WarehouseGroupId != entry.WarehouseGroupId)
+            {
+                var duplicate = await _context.UserWarehouseAccesses
+                    .AnyAsync(a => a.Id != id
+                                && a.UserId == newUserId
+                                && a.CodAlmacen == newCodAlmacen
+                                && a.WarehouseGroupId == request.WarehouseGroupId);
+                if (duplicate)
+                    return BadRequest(new { message = "Ya existe una asignación con ese usuario, almacén y grupo." });
+            }
+
             var caller = User.FindFirstValue(ClaimTypes.Name) ?? User.FindFirstValue(ClaimTypes.Email);
+            entry.UserId = newUserId;
+            entry.CodAlmacen = newCodAlmacen;
             entry.AccesoAlmacen = request.AccesoAlmacen.Trim();
             entry.WarehouseGroupId = request.WarehouseGroupId;
+            entry.FechaModificacion = DateTime.UtcNow;
             entry.ModificadoPor = caller;
 
             await _context.SaveChangesAsync();
@@ -197,6 +232,8 @@ namespace SCNexus.Core.API.Controllers
 
     public class UpdateUsuarioAlmacenRequest
     {
+        public string? UserId { get; set; }
+        public string? CodAlmacen { get; set; }
         public string AccesoAlmacen { get; set; } = string.Empty;
         public Guid? WarehouseGroupId { get; set; }
     }

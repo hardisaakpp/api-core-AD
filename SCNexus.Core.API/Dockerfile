@@ -15,6 +15,9 @@ RUN apt-get update && \
     ldconfig && \
     rm -rf /var/lib/apt/lists/*
 
+# Deshabilitar validación de certificado TLS en libldap (AD con cert autofirmado)
+RUN echo "TLS_REQCERT never" >> /etc/ldap/ldap.conf
+
 COPY --from=build /app/out .
 
 EXPOSE 8080
