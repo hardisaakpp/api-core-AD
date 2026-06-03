@@ -115,7 +115,9 @@ namespace SCNexus.Core.API.Services
                     w.CodAlmacen,
                     w.AccesoAlmacen,
                     GroupId = w.WarehouseGroupId.HasValue ? w.WarehouseGroupId.Value.ToString() : null,
-                    GroupName = w.WarehouseGroup != null ? w.WarehouseGroup.Grupo : null
+                    GroupName = w.WarehouseGroup != null ? w.WarehouseGroup.Grupo : null,
+                    GroupAlmacenes = w.WarehouseGroup != null ? w.WarehouseGroup.Almacenes : new List<string>(),
+                    GroupBodegaCentral = w.WarehouseGroup != null ? w.WarehouseGroup.BodegaCentral : null
                 })
                 .ToListAsync();
 
@@ -127,7 +129,13 @@ namespace SCNexus.Core.API.Services
                     AccesoAlmacen = g.Key.AccesoAlmacen,
                     WarehouseGroups = g
                         .Where(w => w.GroupId != null)
-                        .Select(w => new WarehouseGroupInfo { Id = w.GroupId, Name = w.GroupName })
+                        .Select(w => new WarehouseGroupInfo
+                        {
+                            Id = w.GroupId,
+                            Name = w.GroupName,
+                            Almacenes = w.GroupAlmacenes,
+                            BodegaCentral = w.GroupBodegaCentral
+                        })
                         .ToList()
                 })
                 .ToList();

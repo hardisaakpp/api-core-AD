@@ -63,6 +63,28 @@ namespace SCNexus.Core.API.Controllers
         }
 
         /// <summary>
+        /// Actualizar un permiso existente
+        /// </summary>
+        [HttpPut("{id:int}")]
+        public async Task<IActionResult> UpdatePermission(int id, [FromBody] CreatePermissionRequest request)
+        {
+            var permission = await _context.Permissions.FindAsync(id);
+            if (permission == null)
+                return NotFound(new { message = "Permission not found." });
+
+            if (permission.Key != request.Key && await _context.Permissions.AnyAsync(p => p.Key == request.Key))
+                return BadRequest(new { message = "Permission key already exists." });
+
+            permission.Key = request.Key;
+            permission.Description = request.Description;
+            permission.Module = request.Module;
+
+            await _context.SaveChangesAsync();
+
+            return Ok(permission);
+        }
+
+        /// <summary>
         /// Eliminar un permiso del catálogo
         /// </summary>
         [HttpDelete("{id:int}")]

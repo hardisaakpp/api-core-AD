@@ -4,6 +4,8 @@ namespace SCNexus.Core.API.DTOs
     {
         public string? Id { get; set; }
         public string? Name { get; set; }
+        public List<string> Almacenes { get; set; } = new();
+        public string? BodegaCentral { get; set; }
     }
 
     public class WarehouseAccessInfo
