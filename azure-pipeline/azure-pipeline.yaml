@@ -1,0 +1,55 @@
+trigger:
+  branches:
+    include:
+      - main       # Producción
+      - test       # Pruebas (DESA)
+      - ci/*
+
+pool:
+  name: 'Test-Agents'
+  demands:
+    - Agent.OS -equals Linux
+
+variables:
+  localRegistry: 'localhost:5000'
+  imageRepository: 'api-core-scnexus'
+  dockerfilePath: '$(Build.SourcesDirectory)/SCNexus.Core.API/Dockerfile'
+
+stages:
+# =====================================================================
+# ETAPA 1: CONSTRUCCIÓN DOCKER Y REGISTRO LOCAL (Puro CI)
+# =====================================================================
+- stage: Build_Docker
+  displayName: 'Construcción y Publicación de Imagen Docker'
+  jobs:
+  - job: BuildAndPush
+    displayName: 'Build & Push Docker Local'
+    steps:
+    
+    # 1. Etiquetado Inteligente según la rama
+    - script: |
+        BRANCH_NAME="$(Build.SourceBranchName)"
+        echo "Rama origen del build: $BRANCH_NAME"
+        
+        if [ "$BRANCH_NAME" == "main" ]; then
+          echo "##vso[task.setvariable variable=imageTag]prod-$(Build.BuildId)"
+          echo "##vso[task.setvariable variable=latestTag]prod-latest"
+        else
+          echo "##vso[task.setvariable variable=imageTag]test-$(Build.BuildId)"
+          echo "##vso[task.setvariable variable=latestTag]test-latest"
+        fi
+      displayName: 'Definir Etiquetas Dinámicas'
+
+    # 2. Construir la imagen apuntando al registro local
+    - script: |
+        docker build -f $(dockerfilePath) \
+          -t $(localRegistry)/$(imageRepository):$(imageTag) \
+          -t $(localRegistry)/$(imageRepository):$(latestTag) \
+          $(Build.SourcesDirectory)
+      displayName: 'Construir Imagen Docker'
+
+    # 3. Guardar en el registro interno (Ultra rápido)
+    - script: |
+        docker push $(localRegistry)/$(imageRepository):$(imageTag)
+        docker push $(localRegistry)/$(imageRepository):$(latestTag)
+      displayName: 'Almacenar en Registro Local'

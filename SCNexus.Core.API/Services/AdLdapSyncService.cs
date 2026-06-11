@@ -57,6 +57,7 @@ namespace SCNexus.Core.API.Services
             try
             {
                 conn.SessionOptions.ProtocolVersion = 3;
+                conn.SessionOptions.ReferralChasing = ReferralChasingOptions.None;
                 conn.SessionOptions.SecureSocketLayer = useLdaps;
                 conn.Timeout = TimeSpan.FromSeconds(30);
                 var cred = new NetworkCredential(bindDn, bindPassword);
@@ -173,6 +174,7 @@ namespace SCNexus.Core.API.Services
             try
             {
                 conn.SessionOptions.ProtocolVersion = 3;
+                conn.SessionOptions.ReferralChasing = ReferralChasingOptions.None;
                 conn.SessionOptions.SecureSocketLayer = useLdaps;
                 conn.Timeout = ldapTimeout;
                 // Primero hacer bind con el usuario de servicio para buscar al usuario
@@ -232,6 +234,7 @@ namespace SCNexus.Core.API.Services
             try
             {
                 authConn.SessionOptions.ProtocolVersion = 3;
+                authConn.SessionOptions.ReferralChasing = ReferralChasingOptions.None;
                 authConn.SessionOptions.SecureSocketLayer = useLdaps;
                 authConn.Timeout = TimeSpan.FromSeconds(30);
                 // Intentar bind con el DN del usuario y su contraseña
@@ -322,6 +325,7 @@ namespace SCNexus.Core.API.Services
             try
             {
                 conn.SessionOptions.ProtocolVersion = 3;
+                conn.SessionOptions.ReferralChasing = ReferralChasingOptions.None;
                 conn.SessionOptions.SecureSocketLayer = useLdaps;
                 conn.Timeout = TimeSpan.FromSeconds(30);
                 var cred = new NetworkCredential(bindDn, bindPassword);
