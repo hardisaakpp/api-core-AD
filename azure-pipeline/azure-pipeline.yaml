@@ -5,7 +5,7 @@ trigger:
       - main       # Producción
       - test       # Pruebas (DESA)
       - ci/*
-      - feature/* # Validación de desarrollo
+      - feature/* # Desarrollo
       - fix/*
       - bugfix/*
       - hotfix/*
@@ -23,10 +23,10 @@ variables:
   # Ruta a tu Azure Container Registry corporativo
   imageName: 'dockermg-g9hrgcc4etdrh8eg.azurecr.io/api-core-scnexus'
   
-  # Ruta exacta del Dockerfile
+  # Ubicación exacta del Dockerfile detectada en el análisis
   dockerfilePath: '$(Build.SourcesDirectory)/SCNexus.Core.API/Dockerfile'
 
-  # Lógica Declarativa de Prefijos Dinámicos por Rama
+  # LÓGICA DE ETIQUETADO: Aquí se decide el destino en la nube
   ${{ if eq(variables['Build.SourceBranchName'], 'main') }}:
     envTag: 'prod-latest'
     uniqueTag: 'prod-$(Build.BuildId)'
@@ -45,7 +45,7 @@ stages:
   displayName: 'Integración Continua - Calidad de Código'
   jobs:
   - job: Validar_Codigo
-    displayName: 'Compilación .NET Core'
+    displayName: 'Compilación .NET Core 8'
     steps:
     
     # 1. Configurar SDK de .NET 8
@@ -71,12 +71,13 @@ stages:
         arguments: '--configuration $(buildConfiguration) --no-restore'
 
 # =====================================================================
-# ETAPA 2: CONSTRUCCIÓN Y PUBLICACIÓN EN AZURE CONTAINER REGISTRY
+# ETAPA 2: CONSTRUCCIÓN Y ALMACENAMIENTO EN LA NUBE (ACR)
 # =====================================================================
 - stage: Build_Docker
   displayName: 'Construcción de Imagen Docker'
   dependsOn: CI_Code_Quality
-  # Bloqueo: Solo construye Docker si la Etapa 1 pasó Y si no estamos en rama feature/fix
+  
+  # EL CANDADO: Solo pasa a esta etapa si el código compiló bien Y la rama es main o test
   condition: and(succeeded(), ne(variables.envTag, 'none'))
   jobs:
   - job: BuildAndPush
@@ -85,14 +86,14 @@ stages:
 
     - script: |
         echo "1. Construyendo la imagen de Docker para SCNexus Core ($(envTag))..."
-        # Nota: Se mantiene el contexto de compilación en $(Build.SourcesDirectory) 
-        # para que el Dockerfile pueda acceder a la solución completa si lo necesita.
+        
+        # El contexto $(Build.SourcesDirectory) asegura que el comando copie toda la solución
         docker build -f $(dockerfilePath) \
           -t $(imageName):$(uniqueTag) \
           -t $(imageName):$(envTag) \
           $(Build.SourcesDirectory)
         
-        echo "2. Subiendo imágenes al registro corporativo en la nube..."
+        echo "2. Almacenando la imagen segura en la nube (Azure Container Registry)..."
         docker push $(imageName):$(uniqueTag)
         docker push $(imageName):$(envTag)
       displayName: 'Empaquetar y Almacenar Contenedor en Azure'
