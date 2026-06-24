@@ -25,6 +25,10 @@ obj/
 *.sqlite
 *.sqlite3
 
+## Ignorar archivos de Claude Code
+CLAUDE.md
+.claude/
+
 ## Ignorar archivos temporales
 *.tmp
 *.bak
