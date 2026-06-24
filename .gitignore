@@ -29,6 +29,10 @@ obj/
 CLAUDE.md
 .claude/
 
+## Ignorar artefactos de deploy
+*.zip
+*.tar.gz
+
 ## Ignorar archivos temporales
 *.tmp
 *.bak
