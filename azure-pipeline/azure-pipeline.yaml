@@ -1,55 +1,99 @@
+# Disparador para Integración Continua
 trigger:
   branches:
     include:
       - main       # Producción
       - test       # Pruebas (DESA)
       - ci/*
+      - feature/* # Desarrollo
+      - fix/*
+      - bugfix/*
+      - hotfix/*
 
+# Enrutamiento al servidor Ubuntu
 pool:
   name: 'agents-srv-test'
   demands:
     - Agent.OS -equals Linux
 
 variables:
-  localRegistry: 'localhost:5000'
-  imageRepository: 'api-core-scnexus'
+  buildConfiguration: 'Release'
+  dotnetVersion: '8.x'
+  
+  # Ruta a tu Azure Container Registry corporativo
+  imageName: 'dockermg-g9hrgcc4etdrh8eg.azurecr.io/api-core-scnexus'
+  
+  # Ubicación exacta del Dockerfile detectada en el análisis
   dockerfilePath: '$(Build.SourcesDirectory)/SCNexus.Core.API/Dockerfile'
+
+  # LÓGICA DE ETIQUETADO: Aquí se decide el destino en la nube
+  ${{ if eq(variables['Build.SourceBranchName'], 'main') }}:
+    envTag: 'prod-latest'
+    uniqueTag: 'prod-$(Build.BuildId)'
+  ${{ elseif eq(variables['Build.SourceBranchName'], 'test') }}:
+    envTag: 'test-latest'
+    uniqueTag: 'test-$(Build.BuildId)'
+  ${{ else }}:
+    envTag: 'none'
+    uniqueTag: 'none'
 
 stages:
 # =====================================================================
-# ETAPA 1: CONSTRUCCIÓN DOCKER Y REGISTRO LOCAL (Puro CI)
+# ETAPA 1: VALIDACIÓN DE CÓDIGO (CI Puro para .NET 8)
 # =====================================================================
-- stage: Build_Docker
-  displayName: 'Construcción y Publicación de Imagen Docker'
+- stage: CI_Code_Quality
+  displayName: 'Integración Continua - Calidad de Código'
   jobs:
-  - job: BuildAndPush
-    displayName: 'Build & Push Docker Local'
+  - job: Validar_Codigo
+    displayName: 'Compilación .NET Core 8'
     steps:
     
-    # 1. Etiquetado Inteligente según la rama
+    # 1. Configurar SDK de .NET 8
+    - task: UseDotNet@2
+      displayName: 'Setup .NET $(dotnetVersion) SDK'
+      inputs:
+        packageType: 'sdk'
+        version: '$(dotnetVersion)'
+
+    # 2. Restaurar dependencias
+    - task: DotNetCoreCLI@2
+      displayName: 'Restore dependencies'
+      inputs:
+        command: 'restore'
+        projects: '**/*.csproj'
+
+    # 3. Compilar el proyecto
+    - task: DotNetCoreCLI@2
+      displayName: 'Build project'
+      inputs:
+        command: 'build'
+        projects: '**/*.csproj'
+        arguments: '--configuration $(buildConfiguration) --no-restore'
+
+# =====================================================================
+# ETAPA 2: CONSTRUCCIÓN Y ALMACENAMIENTO EN LA NUBE (ACR)
+# =====================================================================
+- stage: Build_Docker
+  displayName: 'Construcción de Imagen Docker'
+  dependsOn: CI_Code_Quality
+  
+  # EL CANDADO: Solo pasa a esta etapa si el código compiló bien Y la rama es main o test
+  condition: and(succeeded(), ne(variables.envTag, 'none'))
+  jobs:
+  - job: BuildAndPush
+    displayName: 'Build & Push Docker Azure'
+    steps:
+
     - script: |
-        BRANCH_NAME="$(Build.SourceBranchName)"
-        echo "Rama origen del build: $BRANCH_NAME"
+        echo "1. Construyendo la imagen de Docker para SCNexus Core ($(envTag))..."
         
-        if [ "$BRANCH_NAME" == "main" ]; then
-          echo "##vso[task.setvariable variable=imageTag]prod-$(Build.BuildId)"
-          echo "##vso[task.setvariable variable=latestTag]prod-latest"
-        else
-          echo "##vso[task.setvariable variable=imageTag]test-$(Build.BuildId)"
-          echo "##vso[task.setvariable variable=latestTag]test-latest"
-        fi
-      displayName: 'Definir Etiquetas Dinámicas'
-
-    # 2. Construir la imagen apuntando al registro local
-    - script: |
+        # El contexto $(Build.SourcesDirectory) asegura que el comando copie toda la solución
         docker build -f $(dockerfilePath) \
-          -t $(localRegistry)/$(imageRepository):$(imageTag) \
-          -t $(localRegistry)/$(imageRepository):$(latestTag) \
+          -t $(imageName):$(uniqueTag) \
+          -t $(imageName):$(envTag) \
           $(Build.SourcesDirectory)
-      displayName: 'Construir Imagen Docker'
-
-    # 3. Guardar en el registro interno (Ultra rápido)
-    - script: |
-        docker push $(localRegistry)/$(imageRepository):$(imageTag)
-        docker push $(localRegistry)/$(imageRepository):$(latestTag)
-      displayName: 'Almacenar en Registro Local'
+        
+        echo "2. Almacenando la imagen segura en la nube (Azure Container Registry)..."
+        docker push $(imageName):$(uniqueTag)
+        docker push $(imageName):$(envTag)
+      displayName: 'Empaquetar y Almacenar Contenedor en Azure'

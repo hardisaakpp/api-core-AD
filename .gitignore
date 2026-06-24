@@ -25,6 +25,14 @@ obj/
 *.sqlite
 *.sqlite3
 
+## Ignorar archivos de Claude Code
+CLAUDE.md
+.claude/
+
+## Ignorar artefactos de deploy
+*.zip
+*.tar.gz
+
 ## Ignorar archivos temporales
 *.tmp
 *.bak
