@@ -1,83 +1,75 @@
-# Disparador para Integración Continua
 trigger:
   branches:
     include:
-      - main       # Producción
-      - test       # Pruebas (DESA)
+      - main
+      - test
       - ci/*
-      - feature/* # Desarrollo
+      - feature/*
       - fix/*
       - bugfix/*
       - hotfix/*
 
-# Enrutamiento al servidor Ubuntu
 pool:
   name: 'agents-srv-test'
   demands:
     - Agent.OS -equals Linux
 
 variables:
-  buildConfiguration: 'Release'
-  dotnetVersion: '8.x'
-  
-  # Ruta a tu Azure Container Registry corporativo
-  imageName: 'dockermg-g9hrgcc4etdrh8eg.azurecr.io/api-core-scnexus'
-  
-  # Ubicación exacta del Dockerfile detectada en el análisis
-  dockerfilePath: '$(Build.SourcesDirectory)/SCNexus.Core.API/Dockerfile'
-
-  # LÓGICA DE ETIQUETADO: Aquí se decide el destino en la nube
-  ${{ if eq(variables['Build.SourceBranchName'], 'main') }}:
-    envTag: 'prod-latest'
-    uniqueTag: 'prod-$(Build.BuildId)'
-  ${{ elseif eq(variables['Build.SourceBranchName'], 'test') }}:
-    envTag: 'test-latest'
-    uniqueTag: 'test-$(Build.BuildId)'
-  ${{ else }}:
-    envTag: 'none'
-    uniqueTag: 'none'
+  - group: acr-credentials
+  - name: buildConfiguration
+    value: 'Release'
+  - name: dotnetVersion
+    value: '8.x'
+  - name: imageName
+    value: 'dockermg-g9hrgcc4etdrh8eg.azurecr.io/api-core-scnexus'
+  - name: dockerfilePath
+    value: '$(Build.SourcesDirectory)/SCNexus.Core.API/Dockerfile'
+  - ${{ if eq(variables['Build.SourceBranchName'], 'main') }}:
+    - name: envTag
+      value: 'prod-latest'
+    - name: uniqueTag
+      value: 'prod-$(Build.BuildId)'
+  - ${{ elseif eq(variables['Build.SourceBranchName'], 'test') }}:
+    - name: envTag
+      value: 'test-latest'
+    - name: uniqueTag
+      value: 'test-$(Build.BuildId)'
+  - ${{ else }}:
+    - name: envTag
+      value: 'none'
+    - name: uniqueTag
+      value: 'none'
 
 stages:
-# =====================================================================
-# ETAPA 1: VALIDACIÓN DE CÓDIGO (CI Puro para .NET 8)
-# =====================================================================
 - stage: CI_Code_Quality
   displayName: 'Integración Continua - Calidad de Código'
   jobs:
   - job: Validar_Codigo
     displayName: 'Compilación .NET Core 8'
     steps:
-    
-    # 1. Configurar SDK de .NET 8
+
     - task: UseDotNet@2
       displayName: 'Setup .NET $(dotnetVersion) SDK'
       inputs:
         packageType: 'sdk'
         version: '$(dotnetVersion)'
 
-    # 2. Restaurar dependencias
     - task: DotNetCoreCLI@2
       displayName: 'Restore dependencies'
       inputs:
         command: 'restore'
-        projects: '**/*.csproj'
+        projects: 'SCNexus.Core.API/**/*.csproj'
 
-    # 3. Compilar el proyecto
     - task: DotNetCoreCLI@2
       displayName: 'Build project'
       inputs:
         command: 'build'
-        projects: '**/*.csproj'
+        projects: 'SCNexus.Core.API/**/*.csproj'
         arguments: '--configuration $(buildConfiguration) --no-restore'
 
-# =====================================================================
-# ETAPA 2: CONSTRUCCIÓN Y ALMACENAMIENTO EN LA NUBE (ACR)
-# =====================================================================
 - stage: Build_Docker
   displayName: 'Construcción de Imagen Docker'
   dependsOn: CI_Code_Quality
-  
-  # EL CANDADO: Solo pasa a esta etapa si el código compiló bien Y la rama es main o test
   condition: and(succeeded(), ne(variables.envTag, 'none'))
   jobs:
   - job: BuildAndPush
@@ -85,15 +77,18 @@ stages:
     steps:
 
     - script: |
-        echo "1. Construyendo la imagen de Docker para SCNexus Core ($(envTag))..."
-        
-        # El contexto $(Build.SourcesDirectory) asegura que el comando copie toda la solución
+        echo "=== 1. Autenticando en Azure Container Registry ==="
+        echo "$(acr-password)" | docker login dockermg-g9hrgcc4etdrh8eg.azurecr.io \
+          -u "$(acr-username)" \
+          --password-stdin
+
+        echo "=== 2. Construyendo imagen ($(envTag)) ==="
         docker build -f $(dockerfilePath) \
           -t $(imageName):$(uniqueTag) \
           -t $(imageName):$(envTag) \
           $(Build.SourcesDirectory)
-        
-        echo "2. Almacenando la imagen segura en la nube (Azure Container Registry)..."
+
+        echo "=== 3. Publicando en Azure Container Registry ==="
         docker push $(imageName):$(uniqueTag)
         docker push $(imageName):$(envTag)
       displayName: 'Empaquetar y Almacenar Contenedor en Azure'
