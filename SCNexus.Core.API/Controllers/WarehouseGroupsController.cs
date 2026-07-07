@@ -189,8 +189,10 @@ namespace SCNexus.Core.API.Controllers
             if (grupo == null)
                 return NotFound(new { message = "Grupo no encontrado." });
 
-            var accesos = _context.UserWarehouseAccesses.Where(a => a.WarehouseGroupId == id);
-            _context.UserWarehouseAccesses.RemoveRange(accesos);
+            var accesos = await _context.UserWarehouseAccesses.Where(a => a.WarehouseGroupId == id).ToListAsync();
+            foreach (var acceso in accesos)
+                acceso.WarehouseGroupId = null;
+
             _context.WarehouseGroups.Remove(grupo);
             await _context.SaveChangesAsync();
 

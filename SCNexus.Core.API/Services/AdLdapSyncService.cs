@@ -169,7 +169,7 @@ namespace SCNexus.Core.API.Services
                 return null;
             }
 
-            var ldapTimeout = TimeSpan.FromSeconds(10);
+            var ldapTimeout = TimeSpan.FromSeconds(30);
             using var conn = new LdapConnection(ldapIdentifier) { AuthType = AuthType.Basic };
             try
             {
