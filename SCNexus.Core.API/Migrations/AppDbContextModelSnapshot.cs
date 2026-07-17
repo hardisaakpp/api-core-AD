@@ -339,8 +339,7 @@ namespace SCNexus.Core.API.Migrations
 
                     b.HasIndex("UserId", "CodAlmacen", "WarehouseGroupId")
                         .IsUnique()
-                        .HasDatabaseName("i_x_asp_net_user_warehouse_access_user_id_cod_almacen_warehouse_group_id")
-                        .HasFilter("[warehouse_group_id] IS NOT NULL");
+                        .HasDatabaseName("i_x_asp_net_user_warehouse_access_user_id_cod_almacen_warehouse_group_id");
 
                     b.ToTable("asp_net_user_warehouse_access");
                 });
