@@ -89,7 +89,7 @@ namespace SCNexus.Core.API.Controllers
             var items = new List<object>();
             await using var conn = new SqlConnection(cs);
             await conn.OpenAsync();
-            await using var cmd = new SqlCommand("SELECT cod_almacen, nombre FROM dbo.almacenes ORDER BY cod_almacen", conn);
+            await using var cmd = new SqlCommand("SELECT whs_code, whs_name FROM dbo.almacenes_local ORDER BY whs_code", conn);
             await using var reader = await cmd.ExecuteReaderAsync();
             while (await reader.ReadAsync())
             {
@@ -119,6 +119,13 @@ namespace SCNexus.Core.API.Controllers
             var almacenValido = await AlmacenExisteEnScMaestros(codAlmacen);
             if (!almacenValido)
                 return BadRequest(new { message = $"El código de almacén '{codAlmacen}' no existe en el maestro de almacenes (SCMaestros)." });
+
+            var otroAlmacen = await _context.UserWarehouseAccesses
+                .Where(a => a.UserId == request.UserId)
+                .Select(a => a.CodAlmacen)
+                .FirstOrDefaultAsync();
+            if (otroAlmacen != null && otroAlmacen != codAlmacen)
+                return BadRequest(new { message = $"El usuario ya tiene asignado el almacén '{otroAlmacen}'. Un usuario solo puede tener un almacén." });
 
             var duplicate = await _context.UserWarehouseAccesses
                 .AnyAsync(a => a.UserId == request.UserId
@@ -160,6 +167,24 @@ namespace SCNexus.Core.API.Controllers
             var newUserId = string.IsNullOrWhiteSpace(request.UserId) ? entry.UserId : request.UserId.Trim();
             var newCodAlmacen = string.IsNullOrWhiteSpace(request.CodAlmacen) ? entry.CodAlmacen : request.CodAlmacen.Trim().ToUpper();
 
+            var validationError = await ValidateUpdateAsync(id, entry, request, newUserId, newCodAlmacen);
+            if (validationError != null)
+                return validationError;
+
+            var caller = User.FindFirstValue(ClaimTypes.Name) ?? User.FindFirstValue(ClaimTypes.Email);
+            entry.UserId = newUserId;
+            entry.CodAlmacen = newCodAlmacen;
+            entry.AccesoAlmacen = request.AccesoAlmacen.Trim();
+            entry.WarehouseGroupId = request.WarehouseGroupId;
+            entry.FechaModificacion = DateTime.UtcNow;
+            entry.ModificadoPor = caller;
+
+            await _context.SaveChangesAsync();
+            return Ok(new { message = "Asignación actualizada correctamente." });
+        }
+
+        private async Task<IActionResult?> ValidateUpdateAsync(Guid id, AspNetUserWarehouseAccess entry, UpdateUsuarioAlmacenRequest request, string newUserId, string newCodAlmacen)
+        {
             if (newUserId != entry.UserId)
             {
                 var userExists = await _context.Users.AnyAsync(u => u.Id == newUserId);
@@ -174,7 +199,18 @@ namespace SCNexus.Core.API.Controllers
                     return BadRequest(new { message = $"El código de almacén '{newCodAlmacen}' no existe en el maestro de almacenes (SCMaestros)." });
             }
 
-            if (newUserId != entry.UserId || newCodAlmacen != entry.CodAlmacen || request.WarehouseGroupId != entry.WarehouseGroupId)
+            var userOAlmacenCambio = newUserId != entry.UserId || newCodAlmacen != entry.CodAlmacen;
+            if (userOAlmacenCambio)
+            {
+                var otroAlmacen = await _context.UserWarehouseAccesses
+                    .Where(a => a.Id != id && a.UserId == newUserId)
+                    .Select(a => a.CodAlmacen)
+                    .FirstOrDefaultAsync();
+                if (otroAlmacen != null && otroAlmacen != newCodAlmacen)
+                    return BadRequest(new { message = $"Ese usuario ya tiene asignado el almacén '{otroAlmacen}'. Un usuario solo puede tener un almacén." });
+            }
+
+            if (userOAlmacenCambio || request.WarehouseGroupId != entry.WarehouseGroupId)
             {
                 var duplicate = await _context.UserWarehouseAccesses
                     .AnyAsync(a => a.Id != id
@@ -185,16 +221,7 @@ namespace SCNexus.Core.API.Controllers
                     return BadRequest(new { message = "Ya existe una asignación con ese usuario, almacén y grupo." });
             }
 
-            var caller = User.FindFirstValue(ClaimTypes.Name) ?? User.FindFirstValue(ClaimTypes.Email);
-            entry.UserId = newUserId;
-            entry.CodAlmacen = newCodAlmacen;
-            entry.AccesoAlmacen = request.AccesoAlmacen.Trim();
-            entry.WarehouseGroupId = request.WarehouseGroupId;
-            entry.FechaModificacion = DateTime.UtcNow;
-            entry.ModificadoPor = caller;
-
-            await _context.SaveChangesAsync();
-            return Ok(new { message = "Asignación actualizada correctamente." });
+            return null;
         }
 
         [HttpDelete("{id:guid}")]
@@ -215,7 +242,7 @@ namespace SCNexus.Core.API.Controllers
             var cs = _config.GetConnectionString("SCMaestrosConnection");
             await using var conn = new SqlConnection(cs);
             await conn.OpenAsync();
-            await using var cmd = new SqlCommand("SELECT COUNT(1) FROM dbo.almacenes WHERE cod_almacen = @cod", conn);
+            await using var cmd = new SqlCommand("SELECT COUNT(1) FROM dbo.almacenes_local WHERE whs_code = @cod", conn);
             cmd.Parameters.AddWithValue("@cod", codAlmacen);
             var result = await cmd.ExecuteScalarAsync();
             return Convert.ToInt32(result) > 0;
