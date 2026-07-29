@@ -89,7 +89,7 @@ namespace SCNexus.Core.API.Controllers
             var items = new List<object>();
             await using var conn = new SqlConnection(cs);
             await conn.OpenAsync();
-            await using var cmd = new SqlCommand("SELECT cod_almacen, nombre FROM dbo.almacenes ORDER BY cod_almacen", conn);
+            await using var cmd = new SqlCommand("SELECT whs_code, whs_name FROM dbo.almacenes_local ORDER BY whs_code", conn);
             await using var reader = await cmd.ExecuteReaderAsync();
             while (await reader.ReadAsync())
             {
@@ -215,7 +215,7 @@ namespace SCNexus.Core.API.Controllers
             var cs = _config.GetConnectionString("SCMaestrosConnection");
             await using var conn = new SqlConnection(cs);
             await conn.OpenAsync();
-            await using var cmd = new SqlCommand("SELECT COUNT(1) FROM dbo.almacenes WHERE cod_almacen = @cod", conn);
+            await using var cmd = new SqlCommand("SELECT COUNT(1) FROM dbo.almacenes_local WHERE whs_code = @cod", conn);
             cmd.Parameters.AddWithValue("@cod", codAlmacen);
             var result = await cmd.ExecuteScalarAsync();
             return Convert.ToInt32(result) > 0;
