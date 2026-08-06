@@ -11,5 +11,7 @@ namespace SCNexus.Core.API.Models
         public string? ExternalProvider { get; set; }
         // External id from provider (e.g. sAMAccountName, oid)
         public string? ExternalId { get; set; }
+        // Emoji elegido por el usuario como icono de su perfil
+        public string? AvatarEmoji { get; set; }
     }
 }

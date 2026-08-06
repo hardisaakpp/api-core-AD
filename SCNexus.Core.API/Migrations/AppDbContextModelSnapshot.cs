@@ -197,6 +197,10 @@ namespace SCNexus.Core.API.Migrations
                         .HasColumnType("int")
                         .HasColumnName("access_failed_count");
 
+                    b.Property<string>("AvatarEmoji")
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("avatar_emoji");
+
                     b.Property<string>("ConcurrencyStamp")
                         .IsConcurrencyToken()
                         .HasColumnType("nvarchar(max)")

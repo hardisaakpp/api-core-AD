@@ -9,7 +9,7 @@ namespace SCNexus.Core.API.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    [Authorize(Roles = "Admin")]
+    [Authorize]
     public class WarehouseGroupsController : ControllerBase
     {
         private readonly AppDbContext _context;
@@ -19,6 +19,8 @@ namespace SCNexus.Core.API.Controllers
             _context = context;
         }
 
+        // Lectura abierta a cualquier usuario autenticado: otros servicios (ej. Caja Chica)
+        // necesitan resolver a que grupo pertenece un almacen sin ser Admin.
         [HttpGet]
         public async Task<IActionResult> GetAll()
         {
@@ -90,6 +92,7 @@ namespace SCNexus.Core.API.Controllers
         }
 
         [HttpPost]
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> Create([FromBody] WarehouseGroupRequest request)
         {
             if (string.IsNullOrWhiteSpace(request.Grupo))
@@ -136,6 +139,7 @@ namespace SCNexus.Core.API.Controllers
         }
 
         [HttpPut("{id:guid}")]
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> Update(Guid id, [FromBody] WarehouseGroupRequest request)
         {
             if (string.IsNullOrWhiteSpace(request.Grupo))
@@ -183,6 +187,7 @@ namespace SCNexus.Core.API.Controllers
         }
 
         [HttpDelete("{id:guid}")]
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> Delete(Guid id)
         {
             var grupo = await _context.WarehouseGroups.FindAsync(id);
