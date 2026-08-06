@@ -212,6 +212,41 @@ namespace SCNexus.Core.API.Controllers
             return Ok();
         }
 
+        public class UpdateAvatarRequest { public string? Emoji { get; set; } }
+
+        // GET: api/Users/me/avatar
+        [HttpGet("me/avatar")]
+        [Authorize]
+        public async Task<IActionResult> GetMyAvatar()
+        {
+            var userName = User.Identity?.Name;
+            if (string.IsNullOrWhiteSpace(userName)) return Unauthorized();
+
+            var user = await _userService.GetByUserNameAsync(userName);
+            if (user == null) return NotFound();
+
+            return Ok(new { emoji = user.AvatarEmoji });
+        }
+
+        // PUT: api/Users/me/avatar
+        // Body: { "emoji": "😀" }
+        [HttpPut("me/avatar")]
+        [Authorize]
+        public async Task<IActionResult> UpdateMyAvatar([FromBody] UpdateAvatarRequest request)
+        {
+            var userName = User.Identity?.Name;
+            if (string.IsNullOrWhiteSpace(userName)) return Unauthorized();
+
+            var user = await _userService.GetByUserNameAsync(userName);
+            if (user == null) return NotFound();
+
+            user.AvatarEmoji = request?.Emoji;
+            var result = await _userService.UpdateUserAsync(user);
+            if (!result.Succeeded) return BadRequest(result.Errors);
+
+            return Ok(new { emoji = user.AvatarEmoji });
+        }
+
         // GET: api/Users/info/{id}
         // Get basic user info (requires authentication, but not Admin role)
         [HttpGet("info/{id}")]
