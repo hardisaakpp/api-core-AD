@@ -51,10 +51,15 @@ namespace SCNexus.Core.API.Data
                 .HasForeignKey(a => a.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
 
-            // Evita duplicados: un usuario no puede tener el mismo almacén con el mismo grupo dos veces
+            // Evita duplicados exactos: un usuario no puede tener el mismo almacén con el mismo grupo dos veces
+            // (la regla "un usuario = un solo almacén" se valida en el controller, ya que un usuario
+            // puede tener varias filas del mismo almacén con distintos grupos).
+            // HasFilter(null) desactiva la convención de EF de filtrar NULLs de la unicidad: sin esto,
+            // dos filas con WarehouseGroupId NULL para el mismo usuario+almacén no se detectan como duplicado.
             modelBuilder.Entity<AspNetUserWarehouseAccess>()
                 .HasIndex(a => new { a.UserId, a.CodAlmacen, a.WarehouseGroupId })
-                .IsUnique();
+                .IsUnique()
+                .HasFilter(null);
 
             // WarehouseGroup.Almacenes almacenado como JSON en columna nvarchar(max)
             modelBuilder.Entity<WarehouseGroup>()
