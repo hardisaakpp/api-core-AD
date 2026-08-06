@@ -20,6 +20,16 @@ obj/
 .env.local
 *.env
 
+## Ignorar appsettings con datos de conexion/secretos reales (usar los .example.json como plantilla)
+SCNexus.Core.API/appsettings.json
+SCNexus.Core.API/appsettings.*.json
+!SCNexus.Core.API/appsettings.example.json
+!SCNexus.Core.API/appsettings.*.example.json
+
+## Ignorar salida de dotnet publish
+SCNexus.Core.API/publish/
+**/publish/
+
 ## Ignorar archivos de base de datos
 *.db
 *.sqlite
