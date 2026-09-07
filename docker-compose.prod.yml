@@ -5,6 +5,7 @@ services:
       dockerfile: Dockerfile
     container_name: scnexus-core-api
     restart: unless-stopped
+    mem_limit: 512m
     ports:
       - "5053:8080"
     env_file:

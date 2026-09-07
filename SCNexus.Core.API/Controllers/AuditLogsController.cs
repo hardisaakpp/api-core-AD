@@ -22,18 +22,27 @@ namespace SCNexus.Core.API.Controllers
         }
 
         /// <summary>
-        /// Obtiene todos los registros de auditoría (solo para administradores idealmente)
+        /// Obtiene los registros de auditoría, paginados (solo para administradores idealmente)
         /// </summary>
         [HttpGet]
-        public async Task<IActionResult> GetAll()
+        public async Task<IActionResult> GetAll(
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = 50)
         {
             try
             {
-                var logs = await _context.AuditLogs
-                    .OrderByDescending(l => l.CreatedAt)
+                page = Math.Max(1, page);
+                pageSize = Math.Clamp(pageSize, 1, 100);
+
+                var query = _context.AuditLogs.OrderByDescending(l => l.CreatedAt);
+
+                var total = await query.CountAsync();
+                var logs = await query
+                    .Skip((page - 1) * pageSize)
+                    .Take(pageSize)
                     .ToListAsync();
 
-                return Ok(logs);
+                return Ok(new { data = logs, total });
             }
             catch (Exception ex)
             {
