@@ -3,7 +3,6 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using SCNexus.Core.API.Models;
 using SCNexus.Core.API.Services;
-using SCNexus.Core.API.Data;
 
 namespace SCNexus.Core.API.Controllers
 {
@@ -27,26 +26,43 @@ namespace SCNexus.Core.API.Controllers
             return Ok(new { id = user.Id, fullName = user.FullName });
         }
         private readonly AdLdapSyncService _syncService;
+        private readonly LdapSyncRunner _syncRunner;
         private readonly UserManager<AppUser> _userManager;
         private readonly RoleManager<IdentityRole> _roleManager;
-        private readonly AppDbContext _db;
 
-        public AdminController(AdLdapSyncService syncService, UserManager<AppUser> userManager, RoleManager<IdentityRole> roleManager, AppDbContext db)
+        public AdminController(AdLdapSyncService syncService, LdapSyncRunner syncRunner, UserManager<AppUser> userManager, RoleManager<IdentityRole> roleManager)
         {
             _syncService = syncService;
+            _syncRunner = syncRunner;
             _userManager = userManager;
             _roleManager = roleManager;
-            _db = db;
         }
 
+        /// <summary>
+        /// Starts a full AD synchronisation in the background and returns 202 with the current
+        /// status; poll GET sync-ldap/status for the result. Running it inline used to time out at
+        /// the gateway on large directories. 409 when a run is already in progress.
+        /// </summary>
         [HttpPost("sync-ldap")]
-        public async Task<IActionResult> SyncLdap()
+        [Authorize(Roles = "Admin")]
+        public IActionResult SyncLdap()
         {
-            var count = await _syncService.SyncUsersAsync(_userManager, _roleManager, _db);
-            return Ok(new { processed = count });
+            var trigger = $"manual:{User.Identity?.Name ?? "admin"}";
+            if (!_syncRunner.TryStartInBackground(trigger))
+            {
+                return Conflict(new { message = "Ya hay una sincronización de AD en curso.", status = _syncRunner.Status });
+            }
+
+            return Accepted(new { message = "Sincronización de AD iniciada.", status = _syncRunner.Status });
         }
+
+        /// <summary>Last result, whether a run is in progress and when the nightly job fires next.</summary>
+        [HttpGet("sync-ldap/status")]
+        [Authorize(Roles = "Admin")]
+        public IActionResult SyncLdapStatus() => Ok(_syncRunner.Status);
 
         [HttpPost("search-and-import-user")]
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> SearchAndImportUser([FromBody] SearchUserRequest request)
         {
             if (string.IsNullOrWhiteSpace(request.SearchTerm))

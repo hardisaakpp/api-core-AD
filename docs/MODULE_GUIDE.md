@@ -719,8 +719,10 @@ POST /api/Users/{userId}/roles
 # Quitar rol de usuario
 DELETE /api/Users/{userId}/roles/{roleName}
 
-# Sincronizar usuarios desde AD
+# Sincronizar usuarios desde AD (rol Admin; corre en segundo plano, responde 202)
 POST /api/Admin/sync-ldap
+# Estado / último resultado / próxima corrida nocturna
+GET /api/Admin/sync-ldap/status
 ```
 
 ---
