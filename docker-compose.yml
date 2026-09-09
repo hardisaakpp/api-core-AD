@@ -8,8 +8,6 @@ services:
       - "host.docker.internal:host-gateway"
     ports:
       - "5053:8080"
-    env_file:
-      - SCNexus.Core.API/.env
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - LDAPTLS_REQCERT=never

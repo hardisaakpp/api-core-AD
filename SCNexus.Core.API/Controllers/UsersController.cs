@@ -248,12 +248,15 @@ namespace SCNexus.Core.API.Controllers
         }
 
         // GET: api/Users/info/{id}
-        // Get basic user info (requires authentication, but not Admin role)
+        // Get basic user info (requires authentication, but not Admin role).
+        // Accepts the CORE id (GUID) or the network/AD user name: inventory assigns pickers and
+        // recount participants by AD login, and needs to confirm the user exists before saving it.
         [HttpGet("info/{id}")]
         [Authorize]
         public async Task<IActionResult> GetUserInfo(string id)
         {
-            var user = await _userService.GetByIdAsync(id);
+            var user = await _userService.GetByIdAsync(id)
+                       ?? await _userService.GetByUserNameAsync(id);
             if (user == null) return NotFound();
 
             // Return only public/basic information

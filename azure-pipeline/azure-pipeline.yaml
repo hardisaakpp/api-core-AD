@@ -41,54 +41,74 @@ variables:
       value: 'none'
 
 stages:
+# =====================================================================
+# ETAPA 1: VALIDACIÓN DE CÓDIGO Y PRUEBAS (CI Puro para .NET 8)
+# =====================================================================
 - stage: CI_Code_Quality
-  displayName: 'Integración Continua - Calidad de Código'
+  displayName: 'Integración Continua - Calidad y Pruebas'
   jobs:
-  - job: Validar_Codigo
-    displayName: 'Compilación .NET Core 8'
+  - job: Validar_Y_Probar
+    displayName: 'Compilación y Pruebas Unitarias'
     steps:
 
+    # 1. Configurar SDK de .NET 8
     - task: UseDotNet@2
       displayName: 'Setup .NET $(dotnetVersion) SDK'
       inputs:
         packageType: 'sdk'
         version: '$(dotnetVersion)'
 
+    # 2. Restaurar dependencias
     - task: DotNetCoreCLI@2
       displayName: 'Restore dependencies'
       inputs:
         command: 'restore'
-        projects: 'SCNexus.Core.API/**/*.csproj'
+        projects: '**/*.csproj'
 
+    # 3. Compilar la solución (Clean Architecture)
     - task: DotNetCoreCLI@2
-      displayName: 'Build project'
+      displayName: 'Build solution'
       inputs:
         command: 'build'
-        projects: 'SCNexus.Core.API/**/*.csproj'
+        projects: '**/*.csproj'
         arguments: '--configuration $(buildConfiguration) --no-restore'
 
+    # 4. Pruebas Unitarias (DESACTIVADAS TEMPORALMENTE)
+    # - task: DotNetCoreCLI@2
+    #   displayName: 'Run Unit Tests'
+    #   inputs:
+    #     command: 'test'
+    #     projects: '**/*UnitTests.csproj'
+    #     arguments: '--configuration $(buildConfiguration) --no-build'
+    #     publishTestResults: true
+
+# =====================================================================
+# ETAPA 2: CONSTRUCCIÓN Y PUBLICACIÓN EN AZURE CONTAINER REGISTRY
+# =====================================================================
 - stage: Build_Docker
   displayName: 'Construcción de Imagen Docker'
   dependsOn: CI_Code_Quality
+  # Bloqueo: Solo construye Docker si la Etapa 1 pasó Y si no estamos en rama feature/fix
   condition: and(succeeded(), ne(variables.envTag, 'none'))
   jobs:
   - job: BuildAndPush
     displayName: 'Build & Push Docker Azure'
     steps:
 
-    # [CAMBIO 1 y 3]: Uso de bash, set -euo pipefail e inyección segura por env:
+    # [ESTANDARIZACIÓN 1]: Autenticación segura, Build y Push
     - bash: |
         set -euo pipefail
+
         echo "=== 1. Autenticando en Azure Container Registry ==="
         printf '%s' "$ACR_PASSWORD" | docker login dockermg-g9hrgcc4etdrh8eg.azurecr.io -u "$ACR_USERNAME" --password-stdin
 
-        echo "=== 2. Construyendo imagen ($ENV_TAG) ==="
+        echo "=== 2. Construyendo imagen Docker para SCNexus Core API ($ENV_TAG) ==="
         docker build -f $DOCKERFILE_PATH \
           -t $IMAGE_NAME:$UNIQUE_TAG \
           -t $IMAGE_NAME:$ENV_TAG \
           $(Build.SourcesDirectory)
 
-        echo "=== 3. Publicando en Azure Container Registry ==="
+        echo "=== 3. Subiendo imágenes al registro corporativo en la nube ==="
         docker push $IMAGE_NAME:$UNIQUE_TAG
         docker push $IMAGE_NAME:$ENV_TAG
       displayName: 'Empaquetar y Almacenar Contenedor en Azure'
@@ -100,7 +120,7 @@ stages:
         IMAGE_NAME: $(imageName)
         DOCKERFILE_PATH: $(dockerfilePath)
 
-    # [CAMBIO 2]: Generación del artefacto de texto (manifiesto)
+    # [ESTANDARIZACIÓN 2]: Generación del artefacto de texto inmutable
     - bash: |
         set -euo pipefail
         mkdir -p $(Build.ArtifactStagingDirectory)/deploy-info
@@ -108,9 +128,15 @@ stages:
         echo "Tag publicado para CD: $(uniqueTag)"
       displayName: 'Generar metadata de despliegue'
 
-    # [CAMBIO 2]: Publicación del artefacto para que el CD lo pueda leer
+    # [ESTANDARIZACIÓN 3]: Publicación para el CD
     - task: PublishBuildArtifacts@1
       inputs:
         PathtoPublish: '$(Build.ArtifactStagingDirectory)/deploy-info'
         ArtifactName: 'deploy-info'
       displayName: 'Publicar artefacto deploy-info'
+
+    # [ESTANDARIZACIÓN 4]: Limpieza de sesión
+    - bash: |
+        docker logout dockermg-g9hrgcc4etdrh8eg.azurecr.io || true
+      displayName: 'Cerrar sesión de ACR'
+      condition: always()
