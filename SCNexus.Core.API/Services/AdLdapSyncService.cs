@@ -20,8 +20,27 @@ namespace SCNexus.Core.API.Services
             _logger = logger;
         }
 
-        public async Task<int> SyncUsersAsync(UserManager<AppUser> userManager, RoleManager<IdentityRole> roleManager, AppDbContext db)
+        /// <summary>
+        /// Full synchronisation of Active Directory users into the local Identity store.
+        /// Paged search (AD refuses more than 1000 objects per request without paging, which is
+        /// exactly why the previous version failed with "The size limit was exceeded"), person
+        /// objects only (computers are also objectClass=user), and a summary instead of exceptions
+        /// so the nightly job and the manual trigger can report what happened.
+        /// </summary>
+        public async Task<LdapSyncResult> SyncUsersAsync(
+            UserManager<AppUser> userManager,
+            RoleManager<IdentityRole> roleManager,
+            AppDbContext db,
+            string trigger = "manual",
+            CancellationToken cancellationToken = default)
         {
+            var startedAt = DateTimeOffset.UtcNow;
+            var counters = new SyncCounters();
+
+            LdapSyncResult Finish(bool success, string message) =>
+                new(success, message, counters.Processed, counters.Created, counters.Updated, counters.Deactivated,
+                    counters.Skipped, counters.Errors, startedAt, DateTimeOffset.UtcNow, trigger);
+
             var host = _config["Ldap:Host"];
             var portValue = _config["Ldap:Port"];
             if (!int.TryParse(portValue, out var port))
@@ -34,11 +53,13 @@ namespace SCNexus.Core.API.Services
             var searchBase = _config["Ldap:SearchBase"] ?? string.Empty;
             var userFilter = _config["Ldap:UserFilter"] ?? "(objectClass=user)";
             var defaultRole = _config["Ldap:DefaultRole"] ?? "User";
+            var deactivateMissing = bool.TryParse(_config["Ldap:NightlySync:DeactivateMissing"], out var dm) && dm;
+            var pageSize = int.TryParse(_config["Ldap:PageSize"], out var ps) && ps is > 0 and <= 1000 ? ps : 500;
 
             if (string.IsNullOrWhiteSpace(host) || string.IsNullOrWhiteSpace(bindDn) || string.IsNullOrWhiteSpace(bindPassword))
             {
                 _logger.LogWarning("LDAP config incomplete (Host/BindDn/BindPassword required)");
-                return 0;
+                return Finish(false, "LDAP no está configurado (Host/BindDn/BindPassword).");
             }
 
             var useLdaps = bool.TryParse(_config["Ldap:UseLdaps"], out var ssl) && ssl;
@@ -50,91 +71,234 @@ namespace SCNexus.Core.API.Services
             catch (Exception ex) when (ex is DllNotFoundException || ex is TypeInitializationException)
             {
                 _logger.LogError(ex, "LDAP native library not available (libldap). Cannot sync users.");
-                return 0;
+                return Finish(false, "Librería LDAP nativa no disponible en el servidor (libldap).");
             }
 
+            var timeout = TimeSpan.FromMinutes(2);
             using var conn = new LdapConnection(ldapIdentifier) { AuthType = AuthType.Basic };
             try
             {
                 conn.SessionOptions.ProtocolVersion = 3;
                 conn.SessionOptions.ReferralChasing = ReferralChasingOptions.None;
                 conn.SessionOptions.SecureSocketLayer = useLdaps;
-                conn.Timeout = TimeSpan.FromSeconds(30);
-                var cred = new NetworkCredential(bindDn, bindPassword);
-                conn.Bind(cred);
+                conn.Timeout = timeout;
+                conn.Bind(new NetworkCredential(bindDn, bindPassword));
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to bind to LDAP");
-                throw;
+                return Finish(false, $"No se pudo conectar a Active Directory ({host}:{port}): {ex.Message}");
             }
 
-            var request = new SearchRequest(searchBase, userFilter, SearchScope.Subtree, new[] { "sAMAccountName", "mail", "displayName", "userAccountControl", "objectGUID" });
-            var response = (SearchResponse)conn.SendRequest(request);
-            var processed = 0;
+            // Person accounts only: computers are objectClass=user too, and service/machine accounts
+            // (sAMAccountName ending in $) must never become login users.
+            var filter = $"(&{userFilter}(objectCategory=person)(!(sAMAccountName=*$)))";
+            var attributes = new[] { "sAMAccountName", "mail", "displayName", "userAccountControl", "objectGUID" };
+            var pageControl = new PageResultRequestControl(pageSize);
+            var request = new SearchRequest(searchBase, filter, SearchScope.Subtree, attributes) { TimeLimit = timeout };
+            request.Controls.Add(pageControl);
 
-            foreach (SearchResultEntry entry in response.Entries)
+            var seenExternalIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var pages = 0;
+
+            try
             {
-                try
+                while (true)
                 {
-                    var sam = entry.Attributes["sAMAccountName"]?.GetValues(typeof(string)).FirstOrDefault()?.ToString();
-                    var mail = entry.Attributes["mail"]?.GetValues(typeof(string)).FirstOrDefault()?.ToString();
-                    var display = entry.Attributes["displayName"]?.GetValues(typeof(string)).FirstOrDefault()?.ToString();
-                    var uacStr = entry.Attributes["userAccountControl"]?.GetValues(typeof(string)).FirstOrDefault()?.ToString();
-                    bool enabled = true;
-                    if (int.TryParse(uacStr, out var uac)) enabled = (uac & 2) == 0; // UAC & 2 == ACCOUNTDISABLE
+                    cancellationToken.ThrowIfCancellationRequested();
+                    var response = (SearchResponse)conn.SendRequest(request, timeout);
+                    pages++;
 
-                    var externalId = sam ?? mail;
-                    if (string.IsNullOrWhiteSpace(externalId)) continue;
-
-                    var local = await userManager.Users.FirstOrDefaultAsync(u => u.ExternalProvider == "LDAP" && u.ExternalId == externalId);
-                    if (local == null && !string.IsNullOrWhiteSpace(mail))
+                    foreach (SearchResultEntry entry in response.Entries)
                     {
-                        local = await userManager.FindByEmailAsync(mail);
+                        cancellationToken.ThrowIfCancellationRequested();
+                        var outcome = await UpsertFromEntryAsync(entry, userManager, roleManager, defaultRole, seenExternalIds);
+                        counters.Add(outcome);
                     }
 
-                    if (local == null)
+                    var pageResponse = response.Controls.OfType<PageResultResponseControl>().FirstOrDefault();
+                    if (pageResponse is null || pageResponse.Cookie.Length == 0)
                     {
-                        var newUser = new AppUser
-                        {
-                            UserName = !string.IsNullOrWhiteSpace(mail) ? mail : externalId,
-                            Email = mail,
-                            FullName = display ?? string.Empty,
-                            ExternalProvider = "LDAP",
-                            ExternalId = externalId,
-                            IsActive = enabled,
-                            CreatedAt = DateTime.UtcNow
-                        };
-
-                        var createRes = await userManager.CreateAsync(newUser);
-                        if (createRes.Succeeded)
-                        {
-                            if (!await roleManager.RoleExistsAsync(defaultRole)) await roleManager.CreateAsync(new IdentityRole(defaultRole));
-                            await userManager.AddToRoleAsync(newUser, defaultRole);
-                        }
-                    }
-                    else
-                    {
-                        var changed = false;
-                        if (!string.IsNullOrWhiteSpace(mail) && local.Email != mail) { local.Email = mail; local.UserName = mail; changed = true; }
-                        if (!string.IsNullOrWhiteSpace(display) && local.FullName != display) { local.FullName = display; changed = true; }
-                        if (local.IsActive != enabled) { local.IsActive = enabled; changed = true; }
-                        if (string.IsNullOrWhiteSpace(local.ExternalProvider)) { local.ExternalProvider = "LDAP"; changed = true; }
-                        if (string.IsNullOrWhiteSpace(local.ExternalId)) { local.ExternalId = externalId; changed = true; }
-                        if (changed) await userManager.UpdateAsync(local);
+                        break;
                     }
 
-                    processed++;
+                    pageControl.Cookie = pageResponse.Cookie;
                 }
-                catch (Exception ex)
+            }
+            catch (OperationCanceledException)
+            {
+                _logger.LogWarning("LDAP sync cancelled after {Pages} page(s), {Processed} entries", pages, counters.Processed);
+                return Finish(false, "Sincronización cancelada.");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "LDAP search failed after {Pages} page(s), {Processed} entries", pages, counters.Processed);
+                return Finish(false, $"Error consultando Active Directory tras {counters.Processed} usuarios: {ex.Message}");
+            }
+
+            if (deactivateMissing && seenExternalIds.Count > 0)
+            {
+                counters.Deactivated = await DeactivateMissingAsync(userManager, seenExternalIds);
+            }
+
+            var summary = $"AD sync ({trigger}): {counters.Processed} procesados, {counters.Created} creados, {counters.Updated} actualizados, " +
+                          $"{counters.Deactivated} desactivados, {counters.Skipped} omitidos, {counters.Errors} errores, {pages} página(s).";
+            _logger.LogInformation("{Summary}", summary);
+            return Finish(counters.Errors == 0, summary);
+        }
+
+        private enum UpsertOutcome { Created, Updated, Unchanged, Skipped, Error }
+
+        private sealed class SyncCounters
+        {
+            public int Processed;
+            public int Created;
+            public int Updated;
+            public int Deactivated;
+            public int Skipped;
+            public int Errors;
+
+            public void Add(UpsertOutcome outcome)
+            {
+                switch (outcome)
                 {
-                    _logger.LogError(ex, "Error processing LDAP entry {Dn}", entry.DistinguishedName);
+                    case UpsertOutcome.Created: Processed++; Created++; break;
+                    case UpsertOutcome.Updated: Processed++; Updated++; break;
+                    case UpsertOutcome.Unchanged: Processed++; break;
+                    case UpsertOutcome.Skipped: Skipped++; break;
+                    case UpsertOutcome.Error: Errors++; break;
+                }
+            }
+        }
+
+        // Identity's default UserOptions.AllowedUserNameCharacters.
+        private static readonly System.Text.RegularExpressions.Regex ValidUserName =
+            new("^[A-Za-z0-9\\-._@+]+$", System.Text.RegularExpressions.RegexOptions.Compiled);
+
+        // AD attributes sometimes carry trailing spaces (typed by hand in the AD console); trimmed,
+        // otherwise Identity rejects the user name and the account is skipped.
+        private static string? Attr(SearchResultEntry entry, string name)
+        {
+            var value = entry.Attributes[name]?.GetValues(typeof(string)).FirstOrDefault()?.ToString()?.Trim();
+            return string.IsNullOrEmpty(value) ? null : value;
+        }
+
+        private async Task<UpsertOutcome> UpsertFromEntryAsync(
+            SearchResultEntry entry,
+            UserManager<AppUser> userManager,
+            RoleManager<IdentityRole> roleManager,
+            string defaultRole,
+            HashSet<string> seenExternalIds)
+        {
+            try
+            {
+                var sam = Attr(entry, "sAMAccountName");
+                var mail = Attr(entry, "mail");
+                var display = Attr(entry, "displayName");
+                var uacStr = Attr(entry, "userAccountControl");
+                var enabled = !(int.TryParse(uacStr, out var uac) && (uac & 2) != 0); // UAC & 2 == ACCOUNTDISABLE
+
+                var externalId = sam ?? mail;
+                if (string.IsNullOrWhiteSpace(externalId))
+                {
+                    return UpsertOutcome.Skipped;
+                }
+
+                seenExternalIds.Add(externalId);
+
+                var local = await userManager.Users.FirstOrDefaultAsync(u => u.ExternalProvider == "LDAP" && u.ExternalId == externalId);
+                if (local == null && !string.IsNullOrWhiteSpace(mail))
+                {
+                    local = await userManager.FindByEmailAsync(mail);
+                }
+                if (local == null && !string.IsNullOrWhiteSpace(sam))
+                {
+                    // Users created by the login flow or by hand with the AD login as user name.
+                    local = await userManager.FindByNameAsync(sam);
+                }
+
+                if (local == null)
+                {
+                    var userName = !string.IsNullOrWhiteSpace(mail) ? mail : externalId;
+                    if (!ValidUserName.IsMatch(userName))
+                    {
+                        _logger.LogWarning("LDAP entry {Dn} skipped: user name '{UserName}' has characters Identity does not allow", entry.DistinguishedName, userName);
+                        return UpsertOutcome.Skipped;
+                    }
+
+                    var newUser = new AppUser
+                    {
+                        UserName = userName,
+                        Email = mail,
+                        FullName = display ?? string.Empty,
+                        ExternalProvider = "LDAP",
+                        ExternalId = externalId,
+                        IsActive = enabled,
+                        CreatedAt = DateTime.UtcNow
+                    };
+
+                    var createRes = await userManager.CreateAsync(newUser);
+                    if (!createRes.Succeeded)
+                    {
+                        _logger.LogWarning("LDAP entry {Dn} could not be created as '{UserName}': {Errors}", entry.DistinguishedName, userName,
+                            string.Join("; ", createRes.Errors.Select(e => e.Description)));
+                        return UpsertOutcome.Error;
+                    }
+
+                    if (!await roleManager.RoleExistsAsync(defaultRole)) await roleManager.CreateAsync(new IdentityRole(defaultRole));
+                    await userManager.AddToRoleAsync(newUser, defaultRole);
+                    return UpsertOutcome.Created;
+                }
+
+                var changed = false;
+                if (!string.IsNullOrWhiteSpace(mail) && local.Email != mail) { local.Email = mail; local.UserName = mail; changed = true; }
+                if (!string.IsNullOrWhiteSpace(display) && local.FullName != display) { local.FullName = display; changed = true; }
+                if (local.IsActive != enabled) { local.IsActive = enabled; changed = true; }
+                if (string.IsNullOrWhiteSpace(local.ExternalProvider)) { local.ExternalProvider = "LDAP"; changed = true; }
+                if (string.IsNullOrWhiteSpace(local.ExternalId)) { local.ExternalId = externalId; changed = true; }
+
+                if (!changed)
+                {
+                    return UpsertOutcome.Unchanged;
+                }
+
+                var updateRes = await userManager.UpdateAsync(local);
+                if (!updateRes.Succeeded)
+                {
+                    _logger.LogWarning("LDAP entry {Dn} could not update local user {UserId}: {Errors}", entry.DistinguishedName, local.Id,
+                        string.Join("; ", updateRes.Errors.Select(e => e.Description)));
+                    return UpsertOutcome.Error;
+                }
+
+                return UpsertOutcome.Updated;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error processing LDAP entry {Dn}", entry.DistinguishedName);
+                return UpsertOutcome.Error;
+            }
+        }
+
+        /// <summary>Optional (Ldap:NightlySync:DeactivateMissing): LDAP users no longer returned by AD lose IsActive. Never deletes.</summary>
+        private async Task<int> DeactivateMissingAsync(UserManager<AppUser> userManager, HashSet<string> seenExternalIds)
+        {
+            var candidates = await userManager.Users
+                .Where(u => u.ExternalProvider == "LDAP" && u.IsActive && u.ExternalId != null)
+                .ToListAsync();
+
+            var deactivated = 0;
+            foreach (var user in candidates.Where(u => !seenExternalIds.Contains(u.ExternalId!)))
+            {
+                user.IsActive = false;
+                var res = await userManager.UpdateAsync(user);
+                if (res.Succeeded)
+                {
+                    deactivated++;
+                    _logger.LogInformation("LDAP user {UserName} deactivated: no longer present in Active Directory", user.UserName);
                 }
             }
 
-            // connection disposed by using
-            _logger.LogInformation("LDAP sync processed {Count} entries", processed);
-            return processed;
+            return deactivated;
         }
 
         public async Task<AppUser?> AuthenticateLdapUserAsync(string userName, string password, UserManager<AppUser> userManager)
