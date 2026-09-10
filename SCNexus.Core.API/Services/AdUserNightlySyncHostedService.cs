@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace SCNexus.Core.API.Services
 {
     /// <summary>
@@ -75,7 +77,7 @@ namespace SCNexus.Core.API.Services
         }
 
         private static TimeSpan ParseTime(string? value)
-            => TimeSpan.TryParseExact(value?.Trim(), @"hh\:mm", null, out var t) ? t : new TimeSpan(2, 30, 0);
+            => TimeSpan.TryParseExact(value?.Trim(), @"hh\:mm", CultureInfo.InvariantCulture, out var t) ? t : new TimeSpan(2, 30, 0);
 
         private TimeZoneInfo ResolveTimeZone(string? id)
         {
@@ -91,7 +93,7 @@ namespace SCNexus.Core.API.Services
                 }
                 catch (Exception ex) when (ex is TimeZoneNotFoundException || ex is InvalidTimeZoneException)
                 {
-                    _logger.LogWarning("Time zone '{Id}' not available on this host", candidate);
+                    _logger.LogWarning(ex, "Time zone '{Id}' not available on this host", candidate);
                 }
             }
 
