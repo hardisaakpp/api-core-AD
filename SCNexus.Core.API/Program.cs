@@ -106,6 +106,8 @@ builder.Services.AddSwaggerGen(c =>
 builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<UserService>();
 builder.Services.AddScoped<AdLdapSyncService>();
+builder.Services.AddSingleton<LdapSyncRunner>();
+builder.Services.AddHostedService<AdUserNightlySyncHostedService>();
 
 // Try to determine HTTPS port from environment/config to avoid the warning:
 // "Failed to determine the https port for redirect." This commonly occurs when

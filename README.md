@@ -287,13 +287,37 @@ SCNexus.Core.API/
     "Port": 389,
     "Domain": "sunsetcorp.local",
     "BindDn": "ldapconsulta@sunsetcorp.local",
-    "BindPassword": "***REMOVED***",
+    "BindPassword": "<bind-password>",
     "SearchBase": "DC=sunsetcorp,DC=local",
     "UserFilter": "(objectClass=user)",
-    "DefaultRole": "User"
+    "DefaultRole": "User",
+    "PageSize": 500,
+    "NightlySync": {
+      "Enabled": true,
+      "Time": "02:30",
+      "TimeZone": "America/Guayaquil",
+      "DeactivateMissing": false
+    }
   }
 }
 ```
+
+### Sincronización de usuarios con Active Directory
+
+- **Manual:** `POST /api/Admin/sync-ldap` (rol Admin) inicia la sincronización en segundo plano y responde 202;
+  `GET /api/Admin/sync-ldap/status` devuelve si está corriendo, el último resultado (procesados, creados,
+  actualizados, desactivados, omitidos, errores, duración) y la próxima ejecución programada. Si ya hay una en
+  curso responde 409.
+- **Automática:** `AdUserNightlySyncHostedService` corre dentro del Core todas las noches a la hora de
+  `Ldap:NightlySync:Time` en la zona `Ldap:NightlySync:TimeZone` (por defecto 02:30 América/Guayaquil; si el
+  contenedor no tiene tzdata usa UTC-5 fijo). `Enabled=false` la apaga. No requiere cron ni scheduler externo.
+- **Cómo sincroniza:** búsqueda paginada (`PageSize`, 500 por defecto) sobre `SearchBase` con el filtro
+  `UserFilter` **y** `(objectCategory=person)` sin cuentas de máquina (`sAMAccountName` terminado en `$`).
+  Crea usuarios nuevos con `UserName` = correo si existe, si no el login AD; actualiza correo, nombre, estado
+  (`userAccountControl` deshabilitado → `IsActive=false`). Los usuarios que AD ya no devuelve **no** se tocan salvo
+  `DeactivateMissing=true`, que los marca inactivos (nunca borra).
+- Los errores por usuario (nombre inválido para Identity, duplicados) se registran en el log y cuentan en
+  `errors`/`skipped` sin abortar la corrida.
 
 ---
 
