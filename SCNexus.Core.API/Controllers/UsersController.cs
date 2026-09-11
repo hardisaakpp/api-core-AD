@@ -247,6 +247,33 @@ namespace SCNexus.Core.API.Controllers
             return Ok(new { emoji = user.AvatarEmoji });
         }
 
+        // GET: api/Users/search?q=jper&limit=10
+        // Autocomplete for any authenticated user: matches user name, full name or email of active
+        // users and returns only basic public fields. Inventory uses it to pick pickers/recount
+        // participants without knowing how the account is registered (login vs. email).
+        [HttpGet("search")]
+        [Authorize]
+        public async Task<IActionResult> Search([FromQuery] string q, [FromQuery] int limit = 10)
+        {
+            var term = q?.Trim() ?? string.Empty;
+            if (term.Length < 2) return Ok(Array.Empty<object>());
+
+            limit = Math.Clamp(limit, 1, 20);
+            var (users, _) = await _userService.GetPagedUsersAsync(1, limit, term);
+
+            var result = users
+                .Where(u => u.IsActive)
+                .Select(u => new
+                {
+                    id = u.Id,
+                    userName = u.UserName,
+                    fullName = u.FullName,
+                    email = u.Email
+                });
+
+            return Ok(result);
+        }
+
         // GET: api/Users/info/{id}
         // Get basic user info (requires authentication, but not Admin role).
         // Accepts the CORE id (GUID) or the network/AD user name: inventory assigns pickers and
