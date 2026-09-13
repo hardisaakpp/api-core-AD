@@ -49,10 +49,11 @@ Si el hallazgo es puramente de estilo/convención y corregirlo:
 2. Ejecutar los tests existentes (`dotnet test`) **antes y después** de cada cambio. Si no hay tests para ese código, avisar antes de tocarlo.
 3. Trabajar siempre en una rama separada (nunca directo a `main`); el usuario revisa el diff antes de mergear.
 4. Documentar cada cambio: regla resuelta, archivo, línea, y una frase de qué se hizo.
+5. Además del commit, agregar siempre una entrada breve en la sección 6, **aunque el hallazgo aparezca por primera vez** — no esperar a que se repita. El objetivo es ir construyendo un registro que ayude a evitar reintroducir el mismo tipo de issue al escribir código nuevo.
 
 ## 6. Patrones recurrentes en este repo (.NET 8 / C#)
 
-Este repo todavía no tiene su propia campaña de correcciones de Sonar documentada. Como
+Registro de hallazgos de Sonar resueltos en este repo — **cada issue se documenta acá desde la primera vez que aparece**, no solo cuando se repite (ver sección 5, paso 5). Este repo todavía no tiene su propia campaña de correcciones de Sonar documentada. Como
 comparte stack (.NET 8/C#) con `api-middleware-sap`, estos dos patrones ya verificados ahí
 aplican igual de entrada — agregar aquí los que sean específicos de `scnexus-core` a medida que
 se detecten (y avisar en `api-middleware-sap`/`mba3-consultas` si el patrón nuevo es genérico):
