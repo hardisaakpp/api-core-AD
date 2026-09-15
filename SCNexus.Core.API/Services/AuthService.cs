@@ -61,10 +61,13 @@ namespace SCNexus.Core.API.Services
                 authClaims.Add(new Claim("permission", permission));
             }
 
-            // Añadir accesos a almacenes como claims JSON
-            foreach (var wa in warehouseAccesses)
+            // Añadir accesos a almacenes como claims JSON, en su proyección mínima (sin nombre ni bodega
+            // central de los grupos, sin grupos para Administrador/Tienda, almacenes unidos para
+            // Supervisor). El cuerpo del login (UserInfo.WarehouseAccesses) sigue completo.
+            // Ver WarehouseAccessClaimBuilder y docs/JWT-WAREHOUSE-ACCESS.md.
+            foreach (var wa in WarehouseAccessClaimBuilder.Build(warehouseAccesses))
             {
-                authClaims.Add(new Claim("warehouse_access", JsonSerializer.Serialize(wa, _camelCaseOptions)));
+                authClaims.Add(new Claim(WarehouseAccessClaimBuilder.ClaimType, JsonSerializer.Serialize(wa, _camelCaseOptions)));
             }
 
             var jwtKey = _config["Jwt:Key"] ?? throw new InvalidOperationException("JWT Key not configured");
