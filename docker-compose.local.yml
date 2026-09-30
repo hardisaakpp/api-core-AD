@@ -1,0 +1,64 @@
+# SQL Server local para desarrollo (reemplaza los servidores 210.17.1.54 y 192.168.2.211).
+# Uso:  docker compose -f docker-compose.local.yml up -d
+# La contraseña de "sa" se lee de .env (MSSQL_SA_PASSWORD), que está en .gitignore.
+# SCNexusDB la crea la API al arrancar (migraciones EF); aquí solo se prepara sc_maestros.
+services:
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: scnexus-sqlserver
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_PID: "Developer"
+      MSSQL_SA_PASSWORD: "${MSSQL_SA_PASSWORD:?Define MSSQL_SA_PASSWORD en .env}"
+    ports:
+      - "1433:1433"
+    volumes:
+      - scnexus-sqldata:/var/opt/mssql
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -C -Q \"SELECT 1\" || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  # Contenedor de un solo uso: crea sc_maestros y sus tablas de ejemplo (idempotente).
+  sqlserver-init:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+    environment:
+      MSSQL_SA_PASSWORD: "${MSSQL_SA_PASSWORD}"
+    volumes:
+      - ./local-db:/scripts:ro
+    entrypoint: ["/bin/bash", "-c", "/opt/mssql-tools18/bin/sqlcmd -S sqlserver -U sa -P \"$$MSSQL_SA_PASSWORD\" -C -b -i /scripts/init-sc_maestros.sql"]
+    restart: "no"
+
+  # SCNexus.Core.API — misma imagen que el pipeline (SCNexus.Core.API/Dockerfile).
+  # Aplica migraciones y seed de SCNexusDB al arrancar. Expuesta en http://localhost:5053.
+  # Tras cambiar código: docker compose -f docker-compose.local.yml up -d --build api
+  api:
+    build:
+      context: ./SCNexus.Core.API
+    container_name: scnexus-core-api
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+      sqlserver-init:
+        condition: service_completed_successfully
+    environment:
+      ASPNETCORE_ENVIRONMENT: "Development"
+      ConnectionStrings__DefaultConnection: "Server=sqlserver,1433;Database=SCNexusDB;User Id=sa;Password=${MSSQL_SA_PASSWORD};TrustServerCertificate=True;"
+      ConnectionStrings__SCMaestrosConnection: "Server=sqlserver,1433;Database=sc_maestros;User Id=sa;Password=${MSSQL_SA_PASSWORD};TrustServerCertificate=True;"
+      Jwt__Key: "${JWT_KEY:?Define JWT_KEY en .env}"
+      Jwt__Issuer: "SCNexus.Core"
+      Jwt__Audience: "SCNexus.Users"
+      # Sin Active Directory: Host vacío desactiva LDAP; solo login local.
+      Ldap__Host: ""
+      Ldap__NightlySync__Enabled: "false"
+    ports:
+      - "5053:8080"
+    restart: unless-stopped
+
+volumes:
+  scnexus-sqldata:
