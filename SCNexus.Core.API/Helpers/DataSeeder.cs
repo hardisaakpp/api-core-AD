@@ -59,7 +59,12 @@ namespace SCNexus.Core.API.Helpers
                 
                 // Permisos del módulo Reportes (ejemplo)
                 new Permission { Key = "reportes.view", Description = "Ver reportes", Module = "reportes" },
-                new Permission { Key = "reportes.export", Description = "Exportar reportes", Module = "reportes" }
+                new Permission { Key = "reportes.export", Description = "Exportar reportes", Module = "reportes" },
+
+                // Permisos del módulo ODC SAP (api-odc-mba3)
+                new Permission { Key = "odc.view", Description = "Ver Gestión ODC SAP", Module = "odc" },
+                new Permission { Key = "odcsap.view", Description = "ODC SAP - funcionalidades de El Rayo", Module = "odc" },
+                new Permission { Key = "mabel.view", Description = "ODC SAP - funcionalidades de Mabel Trading", Module = "odc" }
             };
 
             var existingPermissionKeys = await context.Permissions
