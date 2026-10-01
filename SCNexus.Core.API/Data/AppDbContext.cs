@@ -17,6 +17,7 @@ namespace SCNexus.Core.API.Data
         public DbSet<AuditLog> AuditLogs { get; set; } = null!;
         public DbSet<Permission> Permissions { get; set; } = null!;
         public DbSet<RolePermission> RolePermissions { get; set; } = null!;
+        public DbSet<RoleDescription> RoleDescriptions { get; set; } = null!;
         public DbSet<AspNetUserWarehouseAccess> UserWarehouseAccesses { get; set; } = null!;
         public DbSet<WarehouseGroup> WarehouseGroups { get; set; } = null!;
 
@@ -38,6 +39,15 @@ namespace SCNexus.Core.API.Data
                 .HasOne(rp => rp.Permission)
                 .WithMany(p => p.RolePermissions)
                 .HasForeignKey(rp => rp.PermissionId);
+
+            // Descripción de rol: 1:1 con AspNetRoles; se elimina junto con el rol.
+            modelBuilder.Entity<RoleDescription>(e =>
+            {
+                e.HasKey(r => r.RoleId);
+                e.Property(r => r.RoleId).HasMaxLength(450);
+                e.Property(r => r.Description).HasMaxLength(RoleDescription.MaxLength).IsRequired();
+                e.HasOne<IdentityRole>().WithOne().HasForeignKey<RoleDescription>(r => r.RoleId).OnDelete(DeleteBehavior.Cascade);
+            });
 
             // Índice único en Permission.Key
             modelBuilder.Entity<Permission>()

@@ -418,6 +418,25 @@ namespace SCNexus.Core.API.Migrations
                     b.ToTable("permissions");
                 });
 
+            modelBuilder.Entity("SCNexus.Core.API.Models.RoleDescription", b =>
+                {
+                    b.Property<string>("RoleId")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)")
+                        .HasColumnName("role_id");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)")
+                        .HasColumnName("description");
+
+                    b.HasKey("RoleId")
+                        .HasName("p_k_role_descriptions");
+
+                    b.ToTable("role_descriptions");
+                });
+
             modelBuilder.Entity("SCNexus.Core.API.Models.RolePermission", b =>
                 {
                     b.Property<string>("RoleId")
@@ -558,6 +577,16 @@ namespace SCNexus.Core.API.Migrations
                     b.Navigation("User");
 
                     b.Navigation("WarehouseGroup");
+                });
+
+            modelBuilder.Entity("SCNexus.Core.API.Models.RoleDescription", b =>
+                {
+                    b.HasOne("Microsoft.AspNetCore.Identity.IdentityRole", null)
+                        .WithOne()
+                        .HasForeignKey("SCNexus.Core.API.Models.RoleDescription", "RoleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("f_k_role_descriptions_asp_net_roles_role_id");
                 });
 
             modelBuilder.Entity("SCNexus.Core.API.Models.RolePermission", b =>
