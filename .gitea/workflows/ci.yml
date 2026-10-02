@@ -1,0 +1,68 @@
+# Pipeline local (Gitea Actions): build -> tests+cobertura -> SonarQube -> quality gate
+name: CI
+on:
+  push:
+    branches: [main, test, develop, 'ci/**', 'feature/**', 'fix/**']
+
+jobs:
+  calidad:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: https://github.com/actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: https://github.com/actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Java (requerido por el scanner de Sonar)
+        run: apt-get update -qq && apt-get install -y -qq default-jre-headless
+
+      - name: Instalar dotnet-sonarscanner
+        run: |
+          dotnet tool install --global dotnet-sonarscanner
+          echo "$HOME/.dotnet/tools" >> "$GITHUB_PATH"
+
+      # El proyecto de tests no referencia coverlet: se agrega solo en el workspace del CI.
+      - name: Agregar coverlet (solo CI)
+        run: dotnet add tests/SCNexus.Core.Tests package coverlet.collector --version 6.0.2
+
+      - name: Configuración de cobertura (opencover)
+        run: |
+          cat > coverage.runsettings <<'XML'
+          <RunSettings><DataCollectionRunSettings><DataCollectors>
+            <DataCollector friendlyName="XPlat Code Coverage"><Configuration><Format>opencover</Format></Configuration></DataCollector>
+          </DataCollectors></DataCollectionRunSettings></RunSettings>
+          XML
+
+      - name: Sonar begin
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+        run: |
+          dotnet sonarscanner begin /k:"api-core-scnexus" /d:sonar.host.url="$SONAR_HOST_URL" /d:sonar.token="$SONAR_TOKEN" \
+            /d:sonar.cs.opencover.reportsPaths="**/TestResults/**/coverage.opencover.xml" \
+            /d:sonar.exclusions="**/Migrations/**" /d:sonar.qualitygate.wait=true
+
+      # Sin warnaserror: las reglas de Sonar se reportan en SonarQube, no deben romper el build.
+      - name: Build
+        run: dotnet build scnexus-core.sln --configuration Release -p:TreatWarningsAsErrors=false
+
+      # La solución no incluye el proyecto de tests: dotnet test lo compila (dentro de la sesión de Sonar).
+      - name: Tests con cobertura
+        id: tests
+        continue-on-error: true
+        run: |
+          dotnet test tests/SCNexus.Core.Tests/SCNexus.Core.Tests.csproj --configuration Release --collect:"XPlat Code Coverage" --settings coverage.runsettings
+
+      - name: Sonar end + quality gate
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: dotnet sonarscanner end /d:sonar.token="$SONAR_TOKEN"
+
+      - name: Fallar si los tests fallaron
+        if: steps.tests.outcome == 'failure'
+        run: |
+          echo "Hay tests fallando (ver paso 'Tests con cobertura')"
+          exit 1
